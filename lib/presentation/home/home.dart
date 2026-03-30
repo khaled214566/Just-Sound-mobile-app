@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:idgaf/core/configs/assets/app_vectors.dart';
-
+import 'package:idgaf/core/models/files_loader.dart';
 class Home extends StatefulWidget {
   const Home({super.key});
 
@@ -13,6 +13,12 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
   int _selectedIndex = 0;
   late List<AnimationController> _scaleControllers;
   late List<Animation<double>> _scaleAnimations;
+  final List<Widget> _pages = const [
+  SongsPage(),
+  Center(child: Text('Favorites Page')),
+  Center(child: Text('Playlists Page')),
+  Center(child: Text('Converter Page')),
+];
 
   @override
   void initState() {
@@ -60,17 +66,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          // Your main content goes here
-          Center(
-            child: Text(
-              _getPageTitle(_selectedIndex),
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
+      body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onNavItemTapped,

@@ -2,8 +2,9 @@ class Song {
   final String title;
   final String artist;
   final String album;
-  final String duration;
+  final num duration;
   final String filePath;
+  final Timestamp releaseDate;
 
   Song({
     required this.title,
@@ -11,5 +12,6 @@ class Song {
     required this.album,
     required this.duration,
     required this.filePath,
+    required this.releaseDate,
   });
 }
