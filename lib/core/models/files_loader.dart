@@ -34,13 +34,15 @@ class _SongsPageState extends State<SongsPage> {
     try {
       // Request permissions
       final storageStatus = await Permission.storage.request();
-      final manageStorageStatus = await Permission.manageExternalStorage.request();
+      final manageStorageStatus = await Permission.manageExternalStorage
+          .request();
 
       debugPrint("Storage permission: $storageStatus");
       debugPrint("Manage external storage: $manageStorageStatus");
 
       setState(() {
-        _debugMessage = "Permission status: Storage=$storageStatus, Manage=$manageStorageStatus";
+        _debugMessage =
+            "Permission status: Storage=$storageStatus, Manage=$manageStorageStatus";
       });
 
       await _loadSongs();
@@ -62,7 +64,6 @@ class _SongsPageState extends State<SongsPage> {
         "/storage/emulated/0/Music",
         "/storage/emulated/0/Download",
         "/sdcard/Music",
-        "/sdcard/Download",
       ];
 
       debugPrint("Starting to search for songs...");
@@ -81,7 +82,9 @@ class _SongsPageState extends State<SongsPage> {
             debugPrint("  Items found in $dirPath: ${allItems.length}");
 
             for (var item in allItems) {
-              debugPrint("    - ${item.path} (${item is File ? 'FILE' : 'DIR'})");
+              debugPrint(
+                "    - ${item.path} (${item is File ? 'FILE' : 'DIR'})",
+              );
             }
 
             final files = allItems
@@ -120,7 +123,8 @@ class _SongsPageState extends State<SongsPage> {
         _songs = songsList;
         _isLoading = false;
         if (_songs.isEmpty) {
-          _debugMessage = "No MP3 files found. Make sure to add songs to /sdcard/Music/ or /sdcard/Download/";
+          _debugMessage =
+              "No MP3 files found. Make sure to add songs to /sdcard/Music/ or /sdcard/Download/";
         } else {
           _debugMessage = "Loaded ${_songs.length} songs";
         }
@@ -155,9 +159,9 @@ class _SongsPageState extends State<SongsPage> {
       debugPrint("Now playing: ${song['title']}");
     } catch (e) {
       debugPrint("Error playing song: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error playing song: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error playing song: $e")));
     }
   }
 
