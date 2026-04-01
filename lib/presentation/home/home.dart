@@ -1,7 +1,10 @@
+// ignore_for_file: unused_element
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:idgaf/core/configs/assets/app_vectors.dart';
-import 'package:idgaf/core/models/files_loader.dart';
+import 'package:idgaf/presentation/pages/songs_page.dart';
+
 class Home extends StatefulWidget {
   const Home({super.key});
 
@@ -14,11 +17,11 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
   late List<AnimationController> _scaleControllers;
   late List<Animation<double>> _scaleAnimations;
   final List<Widget> _pages = const [
-  SongsPage(),
-  Center(child: Text('Favorites Page')),
-  Center(child: Text('Playlists Page')),
-  Center(child: Text('Converter Page')),
-];
+    SongsPage(),
+    Center(child: Text('Favorites Page')),
+    Center(child: Text('Playlists Page')),
+    Center(child: Text('Converter Page')),
+  ];
 
   @override
   void initState() {

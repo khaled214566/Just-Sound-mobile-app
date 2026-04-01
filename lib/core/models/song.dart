@@ -4,7 +4,7 @@ class Song {
   final String album;
   final num duration;
   final String filePath;
-  final Timestamp releaseDate;
+  final num releaseDate;
 
   Song({
     required this.title,
