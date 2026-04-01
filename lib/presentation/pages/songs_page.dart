@@ -3,8 +3,6 @@ import 'package:idgaf/core/models/audio_player.dart';
 import 'package:idgaf/core/models/files_loader.dart';
 import 'package:idgaf/core/models/permission.dart';
 
-import '../../../core/services/permission_service.dart';
-
 class SongsPage extends StatefulWidget {
   const SongsPage({super.key});
 
