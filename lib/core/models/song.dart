@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 class Song {
   final String title;
   final String artist;
@@ -5,6 +7,7 @@ class Song {
   final num duration;
   final String filePath;
   final num releaseDate;
+  final Uint8List? artwork;
 
   Song({
     required this.title,
@@ -13,5 +16,6 @@ class Song {
     required this.duration,
     required this.filePath,
     required this.releaseDate,
+    this.artwork,
   });
 }

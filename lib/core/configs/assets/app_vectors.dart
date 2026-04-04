@@ -9,4 +9,5 @@ class AppVectors {
   static const String favorites = '${basePath}favorites$format';
   static const String playlists = '${basePath}playlists$format';
   static const String converter = '${basePath}converter$format';
+  static const String songLogo = '${basePath}song_logo$format';
 }

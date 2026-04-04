@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:audio_metadata_reader/audio_metadata_reader.dart';
 
 class SongLoader {
   static Future<List<Map<String, dynamic>>> loadSongs() async {
@@ -24,16 +26,36 @@ class SongLoader {
 
           for (var file in files) {
             final fileName = file.path.split('/').last;
-            final title = fileName.replaceAll('.mp3', '');
 
-            songsList.add({
-              'filePath': file.path,
-              'fileName': fileName,
-              'title': title,
-              'artist': 'Unknown Artist',
-              'album': 'Unknown Album',
-              'duration': 0,
-            });
+            try {
+              final metadata = await readMetadata(file, getImage: true);
+
+              Uint8List? art;
+              if (metadata.pictures.isNotEmpty) {
+                art = metadata.pictures.first.bytes;
+              }
+
+              songsList.add({
+                'filePath': file.path,
+                'fileName': fileName,
+                'title': metadata.title ?? fileName.replaceAll('.mp3', ''),
+                'artist': metadata.artist ?? 'Unknown Artist',
+                'album': metadata.album ?? 'Unknown Album',
+                'duration': metadata.duration?.inMilliseconds ?? 0,
+                'artwork': art, // 👈 ADD THIS
+              });
+            } catch (e) {
+              // fallback if metadata fails
+              songsList.add({
+                'filePath': file.path,
+                'fileName': fileName,
+                'title': fileName.replaceAll('.mp3', ''),
+                'artist': 'Unknown Artist',
+                'album': 'Unknown Album',
+                'duration': 0,
+                'artwork': null,
+              });
+            }
           }
         } catch (_) {}
       }

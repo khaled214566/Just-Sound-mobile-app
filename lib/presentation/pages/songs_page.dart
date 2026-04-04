@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
+import 'package:idgaf/core/configs/assets/app_vectors.dart';
 import 'package:idgaf/core/models/audio_player.dart';
 import 'package:idgaf/core/models/files_loader.dart';
 import 'package:idgaf/core/models/permission.dart';
@@ -105,19 +107,34 @@ class _SongsPageState extends State<SongsPage> {
           final isFavorite = _favorites.contains(index);
 
           return ListTile(
+            onTap: () {
+              if (isPlaying) {
+                _audioService.pause();
+              } else {
+                _playSong(index);
+              }
+            },
             // Song icon on the left
-            leading: Icon(
-              Icons.music_note,
-              size: 28,
-              color: Theme.of(context).primaryColor,
-            ),
+            leading: song['artwork'] != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(
+                      song['artwork'],
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : SvgPicture.asset(AppVectors.songLogo, width: 50, height: 50),
             // Title and artist in the center
             title: Text(
               song['title'],
               style: const TextStyle(fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            subtitle: const Text(
-              "Unknown",
+            subtitle: Text(
+              song['artist'],
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -125,16 +142,6 @@ class _SongsPageState extends State<SongsPage> {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                IconButton(
-                  icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
-                  onPressed: () {
-                    if (isPlaying) {
-                      _audioService.pause();
-                    } else {
-                      _playSong(index);
-                    }
-                  },
-                ),
                 IconButton(
                   icon: Icon(
                     isFavorite ? Icons.favorite : Icons.favorite_border,
