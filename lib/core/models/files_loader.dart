@@ -7,10 +7,10 @@ class SongLoader {
     List<Map<String, dynamic>> songsList = [];
 
     final dirsToSearch = [
-      "/storage/emulated/0/Music",
+      // "/storage/emulated/0/Music",
       "/storage/emulated/0/Download",
-      "/sdcard/Music",
-      "/sdcard/Download",
+      // "/sdcard/Music",
+      // "/sdcard/Download",
     ];
 
     for (final dirPath in dirsToSearch) {
@@ -42,10 +42,9 @@ class SongLoader {
                 'artist': metadata.artist ?? 'Unknown Artist',
                 'album': metadata.album ?? 'Unknown Album',
                 'duration': metadata.duration?.inMilliseconds ?? 0,
-                'artwork': art, // 👈 ADD THIS
+                'artwork': art,
               });
             } catch (e) {
-              // fallback if metadata fails
               songsList.add({
                 'filePath': file.path,
                 'fileName': fileName,
