@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:idgaf/core/configs/assets/app_vectors.dart';
+import 'package:idgaf/core/models/search_delegate.dart';
 import 'package:idgaf/core/models/audio_player.dart';
 import 'package:idgaf/core/models/files_loader.dart';
 import 'package:idgaf/core/models/permission.dart';
@@ -76,7 +77,11 @@ class _SongsPageState extends State<SongsPage> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Songs")),
+        appBar: AppBar(
+          title: const Text("Just Sound"),
+          automaticallyImplyLeading: false, //!
+          actions: [],
+        ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -92,13 +97,28 @@ class _SongsPageState extends State<SongsPage> {
 
     if (_songs.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Songs")),
+        appBar: AppBar(
+          title: const Text("Just Sound"),
+          automaticallyImplyLeading: false,
+          actions: [], //!
+        ),
         body: Center(child: Text(_debugMessage)),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text("${_songs.length} songs")),
+      appBar: AppBar(
+        title: Text("Just Sound"),
+        automaticallyImplyLeading: false, //!
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              showSearch(context: context, delegate: MySearchDelegate());
+            },
+          ),
+        ],
+      ),
       body: ListView.builder(
         itemCount: _songs.length,
         itemBuilder: (context, index) {
