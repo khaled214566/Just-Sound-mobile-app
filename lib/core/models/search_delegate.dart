@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
+import 'package:idgaf/core/configs/assets/app_vectors.dart';
 import 'package:idgaf/core/models/files_loader.dart';
 
 class MySearchDelegate extends SearchDelegate {
@@ -69,11 +71,10 @@ class MySearchDelegate extends SearchDelegate {
                       height: 50,
                       fit: BoxFit.cover,
                     )
-                  : Container(
+                  : SvgPicture.asset(
+                      AppVectors.songLogo,
                       width: 50,
                       height: 50,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.music_note),
                     ),
               title: Text(song['title']),
               subtitle: Text('${song['artist']} • ${song['album']}'),
@@ -141,11 +142,10 @@ class MySearchDelegate extends SearchDelegate {
                       height: 50,
                       fit: BoxFit.cover,
                     )
-                  : Container(
+                  : SvgPicture.asset(
+                      AppVectors.songLogo,
                       width: 50,
                       height: 50,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.music_note),
                     ),
               title: Text(song['title']),
               subtitle: Text('${song['artist']} • ${song['album']}'),

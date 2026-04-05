@@ -43,6 +43,9 @@ class SongLoader {
                 'album': metadata.album ?? 'Unknown Album',
                 'duration': metadata.duration?.inMilliseconds ?? 0,
                 'artwork': art,
+                'downloadDate': DateTime.fromMillisecondsSinceEpoch(
+                  file.lastModifiedSync().millisecondsSinceEpoch,
+                ),
               });
             } catch (e) {
               songsList.add({
@@ -53,6 +56,9 @@ class SongLoader {
                 'album': 'Unknown Album',
                 'duration': 0,
                 'artwork': null,
+                'downloadDate': DateTime.fromMillisecondsSinceEpoch(
+                  file.lastModifiedSync().millisecondsSinceEpoch,
+                ),
               });
             }
           }

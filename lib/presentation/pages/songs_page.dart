@@ -33,6 +33,34 @@ class _SongsPageState extends State<SongsPage> {
     super.dispose();
   }
 
+  void _sortSongs(String option) {
+    setState(() {
+      switch (option) {
+        case 'title':
+          _songs.sort(
+            (a, b) => (a['title'] as String).toLowerCase().compareTo(
+              (b['title'] as String).toLowerCase(),
+            ),
+          );
+          break;
+        case 'artist':
+          _songs.sort(
+            (a, b) => (a['artist'] as String).toLowerCase().compareTo(
+              (b['artist'] as String).toLowerCase(),
+            ),
+          );
+          break;
+        case 'date':
+          _songs.sort(
+            (a, b) => (b['downloadDate'] as DateTime).compareTo(
+              a['downloadDate'] as DateTime,
+            ),
+          );
+          break;
+      }
+    });
+  }
+
   Future<void> _initialize() async {
     bool permissionGranted =
         await PermissionService.requestStoragePermissions();
@@ -116,6 +144,20 @@ class _SongsPageState extends State<SongsPage> {
             onPressed: () {
               showSearch(context: context, delegate: MySearchDelegate());
             },
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.sort),
+            onSelected: (value) {
+              _sortSongs(value); // handle selection
+            },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem(value: 'title', child: Text('Sort by Title')),
+              const PopupMenuItem(
+                value: 'artist',
+                child: Text('Sort by Artist'),
+              ),
+              const PopupMenuItem(value: 'date', child: Text('Sort by Date')),
+            ],
           ),
         ],
       ),
