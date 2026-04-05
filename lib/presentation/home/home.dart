@@ -123,6 +123,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
     );
   }
 
+  // ignore: unused_element
   String _getPageTitle(int index) {
     switch (index) {
       case 0:
