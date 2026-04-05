@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:idgaf/core/configs/assets/app_vectors.dart';
 import 'package:idgaf/core/models/search_delegate.dart';
 import 'package:idgaf/core/models/audio_player.dart';
 import 'package:idgaf/core/models/files_loader.dart';
 import 'package:idgaf/core/models/permission.dart';
+import 'package:idgaf/presentation/choose_mode/bloc/theme_cubit.dart';
 
 class SongsPage extends StatefulWidget {
   const SongsPage({super.key});
@@ -187,8 +189,18 @@ class _SongsPageState extends State<SongsPage> {
                       fit: BoxFit.cover,
                     ),
                   )
-                : SvgPicture.asset(AppVectors.songLogo, width: 50, height: 50),
-            // Title and artist in the center
+                : (context.watch<ThemeCubit>().state == ThemeMode.light)
+                ? SvgPicture.asset(
+                    AppVectors.songLogo_light,
+                    width: 50,
+                    height: 50,
+                  )
+                : SvgPicture.asset(
+                    AppVectors.songLogo_dark,
+                    width: 50,
+                    height: 50,
+                  ),
+
             title: Text(
               song['title'],
               style: const TextStyle(fontWeight: FontWeight.w600),

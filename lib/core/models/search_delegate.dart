@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:idgaf/core/configs/assets/app_vectors.dart';
 import 'package:idgaf/core/models/files_loader.dart';
+import 'package:idgaf/presentation/choose_mode/bloc/theme_cubit.dart';
 
 class MySearchDelegate extends SearchDelegate {
   @override
@@ -71,8 +73,14 @@ class MySearchDelegate extends SearchDelegate {
                       height: 50,
                       fit: BoxFit.cover,
                     )
+                  : (context.watch<ThemeCubit>().state == ThemeMode.light)
+                  ? SvgPicture.asset(
+                      AppVectors.songLogo_light,
+                      width: 50,
+                      height: 50,
+                    )
                   : SvgPicture.asset(
-                      AppVectors.songLogo,
+                      AppVectors.songLogo_dark,
                       width: 50,
                       height: 50,
                     ),
@@ -142,8 +150,14 @@ class MySearchDelegate extends SearchDelegate {
                       height: 50,
                       fit: BoxFit.cover,
                     )
+                  : (context.watch<ThemeCubit>().state == ThemeMode.light)
+                  ? SvgPicture.asset(
+                      AppVectors.songLogo_light,
+                      width: 50,
+                      height: 50,
+                    )
                   : SvgPicture.asset(
-                      AppVectors.songLogo,
+                      AppVectors.songLogo_dark,
                       width: 50,
                       height: 50,
                     ),
