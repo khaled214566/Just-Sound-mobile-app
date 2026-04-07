@@ -7,6 +7,7 @@ import 'package:idgaf/core/models/audio_player.dart';
 import 'package:idgaf/core/models/files_loader.dart';
 import 'package:idgaf/core/models/permission.dart';
 import 'package:idgaf/presentation/choose_mode/bloc/theme_cubit.dart';
+import 'package:idgaf/core/models/BottomSheet.dart';
 
 class SongsPage extends StatefulWidget {
   const SongsPage({super.key});
@@ -20,8 +21,10 @@ class _SongsPageState extends State<SongsPage> {
 
   List<Map<String, dynamic>> _songs = [];
   bool _isLoading = true;
-  String _debugMessage = "Initializing...";
+  String _debugMessage = "Loading...";
   Set<int> _favorites = {}; // Track favorite song indices
+  SortOption _currentSort = SortOption.title;
+  SortBy _currentOrder = SortBy.ascending;
 
   @override
   void initState() {
@@ -35,29 +38,28 @@ class _SongsPageState extends State<SongsPage> {
     super.dispose();
   }
 
-  void _sortSongs(String option) {
+  void _sortSongs(SortOption option, SortBy order) {
     setState(() {
+      int compare<T extends Comparable>(T a, T b) =>
+          order == SortBy.ascending ? a.compareTo(b) : b.compareTo(a);
+
       switch (option) {
-        case 'title':
+        case SortOption.title:
           _songs.sort(
-            (a, b) => (a['title'] as String).toLowerCase().compareTo(
-              (b['title'] as String).toLowerCase(),
-            ),
+            (a, b) =>
+                compare(a['title'].toLowerCase(), b['title'].toLowerCase()),
           );
           break;
-        case 'artist':
+
+        case SortOption.artist:
           _songs.sort(
-            (a, b) => (a['artist'] as String).toLowerCase().compareTo(
-              (b['artist'] as String).toLowerCase(),
-            ),
+            (a, b) =>
+                compare(a['artist'].toLowerCase(), b['artist'].toLowerCase()),
           );
           break;
-        case 'date':
-          _songs.sort(
-            (a, b) => (b['downloadDate'] as DateTime).compareTo(
-              a['downloadDate'] as DateTime,
-            ),
-          );
+
+        case SortOption.date:
+          _songs.sort((a, b) => compare(a['downloadDate'], b['downloadDate']));
           break;
       }
     });
@@ -147,19 +149,24 @@ class _SongsPageState extends State<SongsPage> {
               showSearch(context: context, delegate: MySearchDelegate());
             },
           ),
-          PopupMenuButton<String>(
+          IconButton(
             icon: const Icon(Icons.sort),
-            onSelected: (value) {
-              _sortSongs(value); // handle selection
+            onPressed: () async {
+              final result = await showSortFilterSheet(
+                context,
+                initialSort: _currentSort,
+                initialWay: _currentOrder,
+              );
+
+              if (result != null) {
+                setState(() {
+                  _currentSort = result.sortBy;
+                  _currentOrder = result.genre;
+                });
+
+                _sortSongs(_currentSort, _currentOrder);
+              }
             },
-            itemBuilder: (BuildContext context) => [
-              const PopupMenuItem(value: 'title', child: Text('Sort by Title')),
-              const PopupMenuItem(
-                value: 'artist',
-                child: Text('Sort by Artist'),
-              ),
-              const PopupMenuItem(value: 'date', child: Text('Sort by Date')),
-            ],
           ),
         ],
       ),
