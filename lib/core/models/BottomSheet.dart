@@ -119,8 +119,8 @@ class _SortFilterBottomSheetState extends State<SortFilterBottomSheet> {
 
           // ── Group 2 : Genre ───────────────────────────────────────────────
           _RadioSection<SortBy>(
-            title: 'Genre',
-            icon: Icons.music_note_rounded,
+            title: 'order',
+            icon: Icons.swap_vert,
             options: const [
               _RadioOption(value: SortBy.ascending, label: 'Ascending'),
               _RadioOption(value: SortBy.descending, label: 'Descending'),

@@ -6,6 +6,7 @@ import 'package:idgaf/core/models/search_delegate.dart';
 import 'package:idgaf/core/models/audio_player.dart';
 import 'package:idgaf/core/models/files_loader.dart';
 import 'package:idgaf/core/models/permission.dart';
+import 'package:idgaf/core/models/favorites_service.dart';
 import 'package:idgaf/presentation/choose_mode/bloc/theme_cubit.dart';
 import 'package:idgaf/core/models/BottomSheet.dart';
 
@@ -18,17 +19,15 @@ class SongsPage extends StatefulWidget {
 
 class _SongsPageState extends State<SongsPage> {
   final AudioService _audioService = AudioService();
+  final FavoritesService _favoritesService = FavoritesService();
 
   List<Map<String, dynamic>> _songs = [];
   bool _isLoading = true;
   String _debugMessage = "Loading...";
-  Set<int> _favorites = {};
+  Set<String> _favorites = {};
 
   SortOption _currentSort = SortOption.title;
   SortBy _currentOrder = SortBy.ascending;
-
-  // 🔥 Current playing song (for mini player)
-  Map<String, dynamic>? _currentSong;
 
   @override
   void initState() {
@@ -40,6 +39,34 @@ class _SongsPageState extends State<SongsPage> {
   void dispose() {
     _audioService.dispose();
     super.dispose();
+  }
+
+  // 🔥 LOAD SONGS + FAVORITES
+  Future<void> _initialize() async {
+    bool permissionGranted =
+        await PermissionService.requestStoragePermissions();
+
+    if (!permissionGranted) {
+      setState(() {
+        _debugMessage = "Storage permission denied";
+        _isLoading = false;
+      });
+      return;
+    }
+
+    final songs = await SongLoader.loadSongs();
+
+    // Load favorites from database
+    final favoritePaths = await _favoritesService.getFavoriteFilePaths();
+
+    setState(() {
+      _songs = songs;
+      _favorites = favoritePaths;
+      _isLoading = false;
+      _debugMessage = songs.isEmpty
+          ? "No MP3 files found"
+          : "Loaded ${songs.length} songs";
+    });
   }
 
   // 🔥 SORTING
@@ -68,133 +95,31 @@ class _SongsPageState extends State<SongsPage> {
           break;
       }
 
-      // 🔥 Sync queue with sorted list
       _audioService.setQueue(_songs, _audioService.currentIndex ?? 0);
-    });
-  }
-
-  // 🔥 LOAD SONGS
-  Future<void> _initialize() async {
-    bool permissionGranted =
-        await PermissionService.requestStoragePermissions();
-
-    if (!permissionGranted) {
-      setState(() {
-        _debugMessage = "Storage permission denied";
-        _isLoading = false;
-      });
-      return;
-    }
-
-    final songs = await SongLoader.loadSongs();
-
-    setState(() {
-      _songs = songs;
-      _isLoading = false;
-      _debugMessage = songs.isEmpty
-          ? "No MP3 files found"
-          : "Loaded ${songs.length} songs";
     });
   }
 
   // 🔥 PLAY SONG
   Future<void> _playSong(int index) async {
     await _audioService.playFromList(_songs, index);
-
-    setState(() {
-      _currentSong = _songs[index];
-    });
   }
 
-  // 🔥 FAVORITES
-  void _toggleFavorite(int index) {
-    setState(() {
-      if (_favorites.contains(index)) {
-        _favorites.remove(index);
-      } else {
-        _favorites.add(index);
-      }
-    });
-  }
+  // 🔥 TOGGLE FAVORITE - PERSISTENT
+  Future<void> _toggleFavorite(int index) async {
+    final song = _songs[index];
+    final filePath = song['filePath'];
 
-  // 🔥 MINI PLAYER
-  Widget _buildMiniPlayer() {
-    if (_currentSong == null) return const SizedBox();
-
-    final isPlaying = _audioService.currentIndex != null;
-
-    return Container(
-      height: 70,
-      decoration: BoxDecoration(
-        color: Colors.grey[900],
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        children: [
-          // Song Info
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _currentSong!['title'],
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  _currentSong!['artist'],
-                  style: const TextStyle(color: Colors.white70),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-
-          // Previous
-          IconButton(
-            icon: const Icon(Icons.skip_previous, color: Colors.white),
-            onPressed: () async {
-              await _audioService.playPrevious();
-              setState(() {
-                _currentSong = _songs[_audioService.currentIndex ?? 0];
-              });
-            },
-          ),
-
-          // Play / Pause
-          IconButton(
-            icon: Icon(
-              isPlaying ? Icons.pause : Icons.play_arrow,
-              color: Colors.white,
-            ),
-            onPressed: () async {
-              if (isPlaying) {
-                await _audioService.pause();
-              } else {
-                await _audioService.resume();
-              }
-              setState(() {});
-            },
-          ),
-
-          // Next
-          IconButton(
-            icon: const Icon(Icons.skip_next, color: Colors.white),
-            onPressed: () async {
-              await _audioService.playNext();
-              setState(() {
-                _currentSong = _songs[_audioService.currentIndex ?? 0];
-              });
-            },
-          ),
-        ],
-      ),
-    );
+    if (_favorites.contains(filePath)) {
+      await _favoritesService.removeFavorite(filePath);
+      setState(() {
+        _favorites.remove(filePath);
+      });
+    } else {
+      await _favoritesService.addFavorite(song);
+      setState(() {
+        _favorites.add(filePath);
+      });
+    }
   }
 
   @override
@@ -266,15 +191,11 @@ class _SongsPageState extends State<SongsPage> {
         itemBuilder: (context, index) {
           final song = _songs[index];
           final isPlaying = _audioService.currentIndex == index;
-          final isFavorite = _favorites.contains(index);
+          final isFavorite = _favorites.contains(song['filePath']);
 
           return ListTile(
             onTap: () {
-              if (isPlaying) {
-                _audioService.pause();
-              } else {
-                _playSong(index);
-              }
+              _playSong(index);
             },
 
             leading: song['artwork'] != null
@@ -318,14 +239,11 @@ class _SongsPageState extends State<SongsPage> {
               ),
               onPressed: () => _toggleFavorite(index),
             ),
+
+            selected: isPlaying,
+            selectedTileColor: Colors.grey[850],
           );
         },
-      ),
-
-      // 🔥 MINI PLAYER (appears only when song is playing)
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [if (_currentSong != null) _buildMiniPlayer()],
       ),
     );
   }

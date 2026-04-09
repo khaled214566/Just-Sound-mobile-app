@@ -5,10 +5,12 @@ class AudioService {
 
   List<Map<String, dynamic>> _queue = [];
   int? currentIndex;
+  bool _isPlaying = false;
 
   // 🔥 Constructor (auto next when finished)
   AudioService() {
     _audioPlayer.playerStateStream.listen((state) {
+      _isPlaying = state.playing;
       if (state.processingState == ProcessingState.completed) {
         playNext();
       }
@@ -33,13 +35,31 @@ class AudioService {
       return;
     }
 
-    await _audioPlayer.stop();
-    await _audioPlayer.setFilePath(path);
+    // Only load new file if path changed
+    if (_audioPlayer.sequenceState?.currentSource?.tag != currentIndex) {
+      await _audioPlayer.stop();
+      await _audioPlayer.setFilePath(path);
+    }
+
     await _audioPlayer.play();
+    _isPlaying = true;
   }
 
-  // 🔥 Play from list (main entry)
+  // 🔥 Play from list (main entry) - FIXED: Check if already playing
   Future<void> playFromList(List<Map<String, dynamic>> songs, int index) async {
+    // If clicking the same song that's already playing, toggle pause/play
+    if (currentIndex == index && _isPlaying) {
+      await pause();
+      return;
+    }
+
+    // If clicking the same song that's paused, resume it
+    if (currentIndex == index && !_isPlaying) {
+      await resume();
+      return;
+    }
+
+    // Otherwise, play the new song
     setQueue(songs, index);
     await playCurrent();
   }
@@ -64,9 +84,17 @@ class AudioService {
     }
   }
 
-  // 🔥 Controls
-  Future<void> pause() async => _audioPlayer.pause();
-  Future<void> resume() async => _audioPlayer.play();
+  // 🔥 Controls - FIXED: pause() now properly pauses
+  Future<void> pause() async {
+    await _audioPlayer.pause();
+    _isPlaying = false;
+  }
+
+  // 🔥 Resume - FIXED: resume() continues from where it paused
+  Future<void> resume() async {
+    await _audioPlayer.play();
+    _isPlaying = true;
+  }
 
   void dispose() {
     _audioPlayer.dispose();
