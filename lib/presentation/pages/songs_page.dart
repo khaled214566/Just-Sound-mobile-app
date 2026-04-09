@@ -22,9 +22,13 @@ class _SongsPageState extends State<SongsPage> {
   List<Map<String, dynamic>> _songs = [];
   bool _isLoading = true;
   String _debugMessage = "Loading...";
-  Set<int> _favorites = {}; // Track favorite song indices
+  Set<int> _favorites = {};
+
   SortOption _currentSort = SortOption.title;
   SortBy _currentOrder = SortBy.ascending;
+
+  // 🔥 Current playing song (for mini player)
+  Map<String, dynamic>? _currentSong;
 
   @override
   void initState() {
@@ -38,6 +42,7 @@ class _SongsPageState extends State<SongsPage> {
     super.dispose();
   }
 
+  // 🔥 SORTING
   void _sortSongs(SortOption option, SortBy order) {
     setState(() {
       int compare<T extends Comparable>(T a, T b) =>
@@ -62,9 +67,13 @@ class _SongsPageState extends State<SongsPage> {
           _songs.sort((a, b) => compare(a['downloadDate'], b['downloadDate']));
           break;
       }
+
+      // 🔥 Sync queue with sorted list
+      _audioService.setQueue(_songs, _audioService.currentIndex ?? 0);
     });
   }
 
+  // 🔥 LOAD SONGS
   Future<void> _initialize() async {
     bool permissionGranted =
         await PermissionService.requestStoragePermissions();
@@ -88,13 +97,16 @@ class _SongsPageState extends State<SongsPage> {
     });
   }
 
+  // 🔥 PLAY SONG
   Future<void> _playSong(int index) async {
-    final song = _songs[index];
-    await _audioService.play(song['filePath'], index);
+    await _audioService.playFromList(_songs, index);
 
-    setState(() {});
+    setState(() {
+      _currentSong = _songs[index];
+    });
   }
 
+  // 🔥 FAVORITES
   void _toggleFavorite(int index) {
     setState(() {
       if (_favorites.contains(index)) {
@@ -105,14 +117,93 @@ class _SongsPageState extends State<SongsPage> {
     });
   }
 
+  // 🔥 MINI PLAYER
+  Widget _buildMiniPlayer() {
+    if (_currentSong == null) return const SizedBox();
+
+    final isPlaying = _audioService.currentIndex != null;
+
+    return Container(
+      height: 70,
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          // Song Info
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _currentSong!['title'],
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  _currentSong!['artist'],
+                  style: const TextStyle(color: Colors.white70),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+
+          // Previous
+          IconButton(
+            icon: const Icon(Icons.skip_previous, color: Colors.white),
+            onPressed: () async {
+              await _audioService.playPrevious();
+              setState(() {
+                _currentSong = _songs[_audioService.currentIndex ?? 0];
+              });
+            },
+          ),
+
+          // Play / Pause
+          IconButton(
+            icon: Icon(
+              isPlaying ? Icons.pause : Icons.play_arrow,
+              color: Colors.white,
+            ),
+            onPressed: () async {
+              if (isPlaying) {
+                await _audioService.pause();
+              } else {
+                await _audioService.resume();
+              }
+              setState(() {});
+            },
+          ),
+
+          // Next
+          IconButton(
+            icon: const Icon(Icons.skip_next, color: Colors.white),
+            onPressed: () async {
+              await _audioService.playNext();
+              setState(() {
+                _currentSong = _songs[_audioService.currentIndex ?? 0];
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
           title: const Text("Just Sound"),
-          automaticallyImplyLeading: false, //!
-          actions: [],
+          automaticallyImplyLeading: false,
         ),
         body: Center(
           child: Column(
@@ -132,7 +223,6 @@ class _SongsPageState extends State<SongsPage> {
         appBar: AppBar(
           title: const Text("Just Sound"),
           automaticallyImplyLeading: false,
-          actions: [], //!
         ),
         body: Center(child: Text(_debugMessage)),
       );
@@ -140,8 +230,8 @@ class _SongsPageState extends State<SongsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text("Just Sound"),
-        automaticallyImplyLeading: false, //!
+        title: const Text("Just Sound"),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
@@ -170,6 +260,7 @@ class _SongsPageState extends State<SongsPage> {
           ),
         ],
       ),
+
       body: ListView.builder(
         itemCount: _songs.length,
         itemBuilder: (context, index) {
@@ -185,7 +276,7 @@ class _SongsPageState extends State<SongsPage> {
                 _playSong(index);
               }
             },
-            // Song icon on the left
+
             leading: song['artwork'] != null
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(8),
@@ -219,21 +310,22 @@ class _SongsPageState extends State<SongsPage> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            // Play button and heart on the right
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: Icon(
-                    isFavorite ? Icons.favorite : Icons.favorite_border,
-                    color: isFavorite ? Colors.red : null,
-                  ),
-                  onPressed: () => _toggleFavorite(index),
-                ),
-              ],
+
+            trailing: IconButton(
+              icon: Icon(
+                isFavorite ? Icons.favorite : Icons.favorite_border,
+                color: isFavorite ? Colors.red : null,
+              ),
+              onPressed: () => _toggleFavorite(index),
             ),
           );
         },
+      ),
+
+      // 🔥 MINI PLAYER (appears only when song is playing)
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [if (_currentSong != null) _buildMiniPlayer()],
       ),
     );
   }
