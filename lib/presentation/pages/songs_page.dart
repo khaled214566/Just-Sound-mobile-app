@@ -38,13 +38,13 @@ class _SongsPageState extends State<SongsPage> {
 
     // Rebuild the list whenever the playing song changes so the blue
     // highlight moves to the correct tile.
-    _audioService.currentIndex.addListener(_onAudioStateChanged);
+    _audioService.currentFilePath.addListener(_onAudioStateChanged);
     _audioService.isPlaying.addListener(_onAudioStateChanged);
   }
 
   @override
   void dispose() {
-    _audioService.currentIndex.removeListener(_onAudioStateChanged);
+    _audioService.currentFilePath.removeListener(_onAudioStateChanged);
     _audioService.isPlaying.removeListener(_onAudioStateChanged);
     // Do NOT call _audioService.dispose() — it's a singleton.
     super.dispose();
@@ -111,10 +111,7 @@ class _SongsPageState extends State<SongsPage> {
           break;
       }
 
-      // Keep the queue in sync with the new order while preserving the
-      // currently playing index.
-      final int current = _audioService.currentIndex.value;
-      _audioService.setQueue(_songs, current < 0 ? 0 : current);
+      _audioService.setQueue(_songs);
     });
   }
 
@@ -209,7 +206,9 @@ class _SongsPageState extends State<SongsPage> {
         itemCount: _songs.length,
         itemBuilder: (context, index) {
           final song = _songs[index];
-          final bool isSelected = _audioService.currentIndex.value == index;
+          final String? playingPath = _audioService.currentFilePath.value;
+          final bool isSelected =
+              playingPath != null && playingPath == song['filePath'];
           final bool isFavorite = _favorites.contains(song['filePath']);
 
           return ListTile(

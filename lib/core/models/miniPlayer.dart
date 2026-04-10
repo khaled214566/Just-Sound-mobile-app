@@ -10,15 +10,21 @@ class MiniPlayer extends StatelessWidget {
   Widget build(BuildContext context) {
     final audioService = AudioService();
 
-    // 🔥 Listen to currentIndex: when the song changes, this builder rebuilds
-    return ValueListenableBuilder<int>(
-      valueListenable: audioService.currentIndex,
-      builder: (context, index, child) {
-        // If no song is selected (-1), hide the player
-        if (index == -1 || index >= songs.length)
-          return const SizedBox.shrink();
+    // 🔥 Listen to currentFilePath – the stable song identifier
+    return ValueListenableBuilder<String?>(
+      valueListenable: audioService.currentFilePath,
+      builder: (context, filePath, child) {
+        // If nothing is playing, hide the player
+        if (filePath == null) return const SizedBox.shrink();
 
-        final currentSong = songs[index];
+        // Find the current song in the provided list
+        final currentSong = songs.firstWhere(
+          (song) => song['filePath'] == filePath,
+          orElse: () => <String, dynamic>{}, // fallback (should never happen)
+        );
+
+        // If the song couldn't be found, also hide
+        if (currentSong.isEmpty) return const SizedBox.shrink();
 
         return Container(
           height: 70,
@@ -70,7 +76,6 @@ class MiniPlayer extends StatelessWidget {
               ),
 
               // --- Play/Pause Button ---
-              // 🔥 Listen to isPlaying separately so only this button glows/changes
               ValueListenableBuilder<bool>(
                 valueListenable: audioService.isPlaying,
                 builder: (context, playing, _) {

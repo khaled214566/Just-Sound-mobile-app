@@ -22,12 +22,22 @@ class _FavoritesPageState extends State<FavoritesPage> {
   void initState() {
     super.initState();
     _loadFavorites();
+
+    // 🔥 Listen to changes in the currently playing song
+    _audioService.currentFilePath.addListener(_onAudioStateChanged);
+    _audioService.isPlaying.addListener(_onAudioStateChanged);
   }
 
   @override
   void dispose() {
-    _audioService.dispose();
+    _audioService.currentFilePath.removeListener(_onAudioStateChanged);
+    _audioService.isPlaying.removeListener(_onAudioStateChanged);
+    // No need to call _audioService.dispose() – it's a singleton
     super.dispose();
+  }
+
+  void _onAudioStateChanged() {
+    if (mounted) setState(() {});
   }
 
   // 🔥 Load all favorites from database
@@ -141,26 +151,46 @@ class _FavoritesPageState extends State<FavoritesPage> {
         itemCount: _favorites.length,
         itemBuilder: (context, index) {
           final song = _favorites[index];
-          final isPlaying = _audioService.currentIndex == index;
+
+          // 🔥 Compare file path instead of index
+          final String? playingPath = _audioService.currentFilePath.value;
+          final bool isSelected =
+              playingPath != null && playingPath == song['filePath'];
 
           return ListTile(
             onTap: () {
               _playSong(index);
             },
 
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                width: 50,
-                height: 50,
-                color: Colors.grey[800],
-                child: const Icon(Icons.music_note, color: Colors.white54),
-              ),
-            ),
+            leading: song['artwork'] != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(
+                      song['artwork'],
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      width: 50,
+                      height: 50,
+                      color: Colors.grey[800],
+                      child: const Icon(
+                        Icons.music_note,
+                        color: Colors.white54,
+                      ),
+                    ),
+                  ),
 
             title: Text(
               song['title'],
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: isSelected ? Colors.blue : null,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -175,7 +205,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
               onPressed: () => _removeFavorite(index),
             ),
 
-            selected: isPlaying,
+            selected: isSelected,
             selectedTileColor: Colors.grey[850],
           );
         },

@@ -20,31 +20,52 @@ class AudioService {
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   // ─── State (observable so the UI can react) ───────────────────────────────
-  /// Index of the currently active song in [_queue]. -1 means nothing loaded.
-  final ValueNotifier<int> currentIndex = ValueNotifier<int>(-1);
+  /// File path of the currently active song. `null` means nothing loaded.
+  /// UI should use this to highlight the correct tile.
+  final ValueNotifier<String?> currentFilePath = ValueNotifier<String?>(null);
 
   /// True while the player is actively playing.
   final ValueNotifier<bool> isPlaying = ValueNotifier<bool>(false);
 
+  // ─── Internal index for playback control ─────────────────────────────────
+  int _currentIndex = -1;
+
   // ─── Queue ────────────────────────────────────────────────────────────────
   List<Map<String, dynamic>> _queue = [];
 
-  /// Replace the queue without changing playback.
-  void setQueue(List<Map<String, dynamic>> songs, int startIndex) {
-    _queue = List<Map<String, dynamic>>.from(songs);
-    currentIndex.value = startIndex.clamp(0, songs.length - 1);
+  /// Replace the queue. Automatically preserves the currently playing song
+  /// by locating its new index (if it still exists in the new queue).
+  void setQueue(List<Map<String, dynamic>> newQueue) {
+    final String? playingPath = currentFilePath.value;
+
+    _queue = List<Map<String, dynamic>>.from(newQueue);
+
+    if (playingPath != null) {
+      _currentIndex = _queue.indexWhere(
+        (song) => song['filePath'] == playingPath,
+      );
+    } else {
+      _currentIndex = -1;
+    }
+
+    // Update the file path notifier (handles the case where the song was removed)
+    _syncFilePathFromIndex();
   }
 
   // ─── Playback ─────────────────────────────────────────────────────────────
 
   /// Main entry point used by the song list.
   Future<void> playFromList(List<Map<String, dynamic>> songs, int index) async {
-    // 💡 FIX: Check by length and path instead of List instance equality
-    bool isSameQueue = _queue.length == songs.length && 
-                       _queue.isNotEmpty && 
-                       _queue[0]['filePath'] == songs[0]['filePath'];
+    // Determine if we are tapping the currently playing song from the same queue
+    final String? playingPath = currentFilePath.value;
+    final bool isSameSong =
+        playingPath != null &&
+        index >= 0 &&
+        index < songs.length &&
+        songs[index]['filePath'] == playingPath;
 
-    if (currentIndex.value == index && isSameQueue) {
+    if (isSameSong) {
+      // Toggle play/pause
       if (isPlaying.value) {
         await pause();
       } else {
@@ -53,22 +74,23 @@ class AudioService {
       return;
     }
 
+    // New song or different queue
     _queue = List<Map<String, dynamic>>.from(songs);
-    currentIndex.value = index;
+    _currentIndex = index;
+    _syncFilePathFromIndex();
     await _playCurrent();
   }
- Future<void> _playCurrent() async {
-    if (currentIndex.value < 0 || currentIndex.value >= _queue.length) return;
 
-    final song = _queue[currentIndex.value];
+  Future<void> _playCurrent() async {
+    if (_currentIndex < 0 || _currentIndex >= _queue.length) return;
+
+    final song = _queue[_currentIndex];
     final path = song['filePath'] as String?;
     if (path == null) return;
 
     try {
-      // Use try/catch because file loading can fail
       await _audioPlayer.setFilePath(path);
       await _audioPlayer.play();
-      // isPlaying.value is updated automatically by the listener in constructor
     } catch (e) {
       debugPrint("Error loading audio: $e");
       playNext(); // Skip to next if this one fails
@@ -78,19 +100,21 @@ class AudioService {
   // ─── Controls ─────────────────────────────────────────────────────────────
 
   Future<void> playNext() async {
-    if (currentIndex.value < _queue.length - 1) {
-      currentIndex.value++; // Incrementing ValueNotifier notifies UI
+    if (_currentIndex < _queue.length - 1) {
+      _currentIndex++;
+      _syncFilePathFromIndex();
       await _playCurrent();
     } else {
-      // Optional: Loop to beginning or stop
       await _audioPlayer.stop();
-      currentIndex.value = -1; 
+      _currentIndex = -1;
+      currentFilePath.value = null;
     }
   }
 
   Future<void> playPrevious() async {
-    if (currentIndex.value > 0) {
-      currentIndex.value = currentIndex.value - 1;
+    if (_currentIndex > 0) {
+      _currentIndex--;
+      _syncFilePathFromIndex();
       await _playCurrent();
     }
   }
@@ -107,6 +131,15 @@ class AudioService {
 
   // Exposed for widgets that need low-level stream access (e.g. seek bar).
   AudioPlayer get player => _audioPlayer;
+
+  // ─── Private helpers ──────────────────────────────────────────────────────
+  void _syncFilePathFromIndex() {
+    if (_currentIndex >= 0 && _currentIndex < _queue.length) {
+      currentFilePath.value = _queue[_currentIndex]['filePath'] as String?;
+    } else {
+      currentFilePath.value = null;
+    }
+  }
 
   /// No-op kept for API compatibility — the singleton is never truly disposed.
   void dispose() {}
