@@ -9,6 +9,7 @@ import 'package:idgaf/core/models/permission.dart';
 import 'package:idgaf/core/models/favorites_service.dart';
 import 'package:idgaf/presentation/choose_mode/bloc/theme_cubit.dart';
 import 'package:idgaf/core/models/BottomSheet.dart';
+import 'package:idgaf/core/models/miniPlayer.dart';
 
 class SongsPage extends StatefulWidget {
   const SongsPage({super.key});
@@ -18,12 +19,13 @@ class SongsPage extends StatefulWidget {
 }
 
 class _SongsPageState extends State<SongsPage> {
+  // Singleton — never recreated across rebuilds / navigation
   final AudioService _audioService = AudioService();
   final FavoritesService _favoritesService = FavoritesService();
 
   List<Map<String, dynamic>> _songs = [];
   bool _isLoading = true;
-  String _debugMessage = "Loading...";
+  String _debugMessage = 'Loading...';
   Set<String> _favorites = {};
 
   SortOption _currentSort = SortOption.title;
@@ -33,30 +35,40 @@ class _SongsPageState extends State<SongsPage> {
   void initState() {
     super.initState();
     _initialize();
+
+    // Rebuild the list whenever the playing song changes so the blue
+    // highlight moves to the correct tile.
+    _audioService.currentIndex.addListener(_onAudioStateChanged);
+    _audioService.isPlaying.addListener(_onAudioStateChanged);
   }
 
   @override
   void dispose() {
-    _audioService.dispose();
+    _audioService.currentIndex.removeListener(_onAudioStateChanged);
+    _audioService.isPlaying.removeListener(_onAudioStateChanged);
+    // Do NOT call _audioService.dispose() — it's a singleton.
     super.dispose();
   }
 
-  // 🔥 LOAD SONGS + FAVORITES
-  Future<void> _initialize() async {
-    bool permissionGranted =
-        await PermissionService.requestStoragePermissions();
+  void _onAudioStateChanged() {
+    // Just trigger a rebuild; the ValueListenable does the heavy lifting.
+    if (mounted) setState(() {});
+  }
 
-    if (!permissionGranted) {
+  // ── Load songs + favorites ────────────────────────────────────────────────
+
+  Future<void> _initialize() async {
+    final granted = await PermissionService.requestStoragePermissions();
+
+    if (!granted) {
       setState(() {
-        _debugMessage = "Storage permission denied";
+        _debugMessage = 'Storage permission denied';
         _isLoading = false;
       });
       return;
     }
 
     final songs = await SongLoader.loadSongs();
-
-    // Load favorites from database
     final favoritePaths = await _favoritesService.getFavoriteFilePaths();
 
     setState(() {
@@ -64,12 +76,13 @@ class _SongsPageState extends State<SongsPage> {
       _favorites = favoritePaths;
       _isLoading = false;
       _debugMessage = songs.isEmpty
-          ? "No MP3 files found"
-          : "Loaded ${songs.length} songs";
+          ? 'No MP3 files found'
+          : 'Loaded ${songs.length} songs';
     });
   }
 
-  // 🔥 SORTING
+  // ── Sorting ───────────────────────────────────────────────────────────────
+
   void _sortSongs(SortOption option, SortBy order) {
     setState(() {
       int compare<T extends Comparable>(T a, T b) =>
@@ -82,52 +95,58 @@ class _SongsPageState extends State<SongsPage> {
                 compare(a['title'].toLowerCase(), b['title'].toLowerCase()),
           );
           break;
-
         case SortOption.artist:
           _songs.sort(
             (a, b) =>
                 compare(a['artist'].toLowerCase(), b['artist'].toLowerCase()),
           );
           break;
-
         case SortOption.date:
-          _songs.sort((a, b) => compare(a['downloadDate'], b['downloadDate']));
+          _songs.sort(
+            (a, b) => compare(
+              a['downloadDate'] as DateTime,
+              b['downloadDate'] as DateTime,
+            ),
+          );
           break;
       }
 
-      _audioService.setQueue(_songs, _audioService.currentIndex ?? 0);
+      // Keep the queue in sync with the new order while preserving the
+      // currently playing index.
+      final int current = _audioService.currentIndex.value;
+      _audioService.setQueue(_songs, current < 0 ? 0 : current);
     });
   }
 
-  // 🔥 PLAY SONG
+  // ── Play ──────────────────────────────────────────────────────────────────
+
   Future<void> _playSong(int index) async {
     await _audioService.playFromList(_songs, index);
   }
 
-  // 🔥 TOGGLE FAVORITE - PERSISTENT
+  // ── Favorites ─────────────────────────────────────────────────────────────
+
   Future<void> _toggleFavorite(int index) async {
     final song = _songs[index];
-    final filePath = song['filePath'];
+    final filePath = song['filePath'] as String;
 
     if (_favorites.contains(filePath)) {
       await _favoritesService.removeFavorite(filePath);
-      setState(() {
-        _favorites.remove(filePath);
-      });
+      setState(() => _favorites.remove(filePath));
     } else {
       await _favoritesService.addFavorite(song);
-      setState(() {
-        _favorites.add(filePath);
-      });
+      setState(() => _favorites.add(filePath));
     }
   }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text("Just Sound"),
+          title: const Text('Just Sound'),
           automaticallyImplyLeading: false,
         ),
         body: Center(
@@ -146,7 +165,7 @@ class _SongsPageState extends State<SongsPage> {
     if (_songs.isEmpty) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text("Just Sound"),
+          title: const Text('Just Sound'),
           automaticallyImplyLeading: false,
         ),
         body: Center(child: Text(_debugMessage)),
@@ -155,7 +174,7 @@ class _SongsPageState extends State<SongsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Just Sound"),
+        title: const Text('Just Sound'),
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
@@ -172,13 +191,11 @@ class _SongsPageState extends State<SongsPage> {
                 initialSort: _currentSort,
                 initialWay: _currentOrder,
               );
-
               if (result != null) {
                 setState(() {
                   _currentSort = result.sortBy;
                   _currentOrder = result.genre;
                 });
-
                 _sortSongs(_currentSort, _currentOrder);
               }
             },
@@ -186,17 +203,17 @@ class _SongsPageState extends State<SongsPage> {
         ],
       ),
 
+      bottomNavigationBar: MiniPlayer(songs: _songs),
+
       body: ListView.builder(
         itemCount: _songs.length,
         itemBuilder: (context, index) {
           final song = _songs[index];
-          final isPlaying = _audioService.currentIndex == index;
-          final isFavorite = _favorites.contains(song['filePath']);
+          final bool isSelected = _audioService.currentIndex.value == index;
+          final bool isFavorite = _favorites.contains(song['filePath']);
 
           return ListTile(
-            onTap: () {
-              _playSong(index);
-            },
+            onTap: () => _playSong(index),
 
             leading: song['artwork'] != null
                 ? ClipRRect(
@@ -222,7 +239,11 @@ class _SongsPageState extends State<SongsPage> {
 
             title: Text(
               song['title'],
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                // Blue title for the currently selected / playing song
+                color: isSelected ? Colors.blue : null,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -240,7 +261,7 @@ class _SongsPageState extends State<SongsPage> {
               onPressed: () => _toggleFavorite(index),
             ),
 
-            selected: isPlaying,
+            selected: isSelected,
             selectedTileColor: Colors.grey[850],
           );
         },

@@ -1,102 +1,113 @@
+import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
+/// A singleton [AudioService] so playback state is never lost across
+/// widget rebuilds or navigation.
 class AudioService {
-  final AudioPlayer _audioPlayer = AudioPlayer();
-
-  List<Map<String, dynamic>> _queue = [];
-  int? currentIndex;
-  bool _isPlaying = false;
-
-  // 🔥 Constructor (auto next when finished)
-  AudioService() {
+  // ─── Singleton ────────────────────────────────────────────────────────────
+  static final AudioService _instance = AudioService._internal();
+  factory AudioService() => _instance;
+  AudioService._internal() {
     _audioPlayer.playerStateStream.listen((state) {
-      _isPlaying = state.playing;
+      isPlaying.value = state.playing;
       if (state.processingState == ProcessingState.completed) {
         playNext();
       }
     });
   }
 
-  // 🔥 Set queue
+  // ─── Internal player ──────────────────────────────────────────────────────
+  final AudioPlayer _audioPlayer = AudioPlayer();
+
+  // ─── State (observable so the UI can react) ───────────────────────────────
+  /// Index of the currently active song in [_queue]. -1 means nothing loaded.
+  final ValueNotifier<int> currentIndex = ValueNotifier<int>(-1);
+
+  /// True while the player is actively playing.
+  final ValueNotifier<bool> isPlaying = ValueNotifier<bool>(false);
+
+  // ─── Queue ────────────────────────────────────────────────────────────────
+  List<Map<String, dynamic>> _queue = [];
+
+  /// Replace the queue without changing playback.
   void setQueue(List<Map<String, dynamic>> songs, int startIndex) {
-    _queue = songs;
-    currentIndex = startIndex;
+    _queue = List<Map<String, dynamic>>.from(songs);
+    currentIndex.value = startIndex.clamp(0, songs.length - 1);
   }
 
-  // 🔥 Play current song
-  Future<void> playCurrent() async {
-    if (currentIndex == null || _queue.isEmpty) return;
+  // ─── Playback ─────────────────────────────────────────────────────────────
 
-    final song = _queue[currentIndex!];
-    final path = song['filePath'];
-
-    if (path == null) {
-      print("ERROR: filePath is null → $song");
-      return;
-    }
-
-    // Only load new file if path changed
-    if (_audioPlayer.sequenceState?.currentSource?.tag != currentIndex) {
-      await _audioPlayer.stop();
-      await _audioPlayer.setFilePath(path);
-    }
-
-    await _audioPlayer.play();
-    _isPlaying = true;
-  }
-
-  // 🔥 Play from list (main entry) - FIXED: Check if already playing
+  /// Main entry point used by the song list.
   Future<void> playFromList(List<Map<String, dynamic>> songs, int index) async {
-    // If clicking the same song that's already playing, toggle pause/play
-    if (currentIndex == index && _isPlaying) {
-      await pause();
+    // 💡 FIX: Check by length and path instead of List instance equality
+    bool isSameQueue = _queue.length == songs.length && 
+                       _queue.isNotEmpty && 
+                       _queue[0]['filePath'] == songs[0]['filePath'];
+
+    if (currentIndex.value == index && isSameQueue) {
+      if (isPlaying.value) {
+        await pause();
+      } else {
+        await resume();
+      }
       return;
     }
 
-    // If clicking the same song that's paused, resume it
-    if (currentIndex == index && !_isPlaying) {
-      await resume();
-      return;
-    }
+    _queue = List<Map<String, dynamic>>.from(songs);
+    currentIndex.value = index;
+    await _playCurrent();
+  }
+ Future<void> _playCurrent() async {
+    if (currentIndex.value < 0 || currentIndex.value >= _queue.length) return;
 
-    // Otherwise, play the new song
-    setQueue(songs, index);
-    await playCurrent();
+    final song = _queue[currentIndex.value];
+    final path = song['filePath'] as String?;
+    if (path == null) return;
+
+    try {
+      // Use try/catch because file loading can fail
+      await _audioPlayer.setFilePath(path);
+      await _audioPlayer.play();
+      // isPlaying.value is updated automatically by the listener in constructor
+    } catch (e) {
+      debugPrint("Error loading audio: $e");
+      playNext(); // Skip to next if this one fails
+    }
   }
 
-  // 🔥 Next
+  // ─── Controls ─────────────────────────────────────────────────────────────
+
   Future<void> playNext() async {
-    if (currentIndex == null) return;
-
-    if (currentIndex! < _queue.length - 1) {
-      currentIndex = currentIndex! + 1;
-      await playCurrent();
+    if (currentIndex.value < _queue.length - 1) {
+      currentIndex.value++; // Incrementing ValueNotifier notifies UI
+      await _playCurrent();
+    } else {
+      // Optional: Loop to beginning or stop
+      await _audioPlayer.stop();
+      currentIndex.value = -1; 
     }
   }
 
-  // 🔥 Previous
   Future<void> playPrevious() async {
-    if (currentIndex == null) return;
-
-    if (currentIndex! > 0) {
-      currentIndex = currentIndex! - 1;
-      await playCurrent();
+    if (currentIndex.value > 0) {
+      currentIndex.value = currentIndex.value - 1;
+      await _playCurrent();
     }
   }
 
-  // 🔥 Controls - FIXED: pause() now properly pauses
   Future<void> pause() async {
     await _audioPlayer.pause();
-    _isPlaying = false;
+    isPlaying.value = false;
   }
 
-  // 🔥 Resume - FIXED: resume() continues from where it paused
   Future<void> resume() async {
     await _audioPlayer.play();
-    _isPlaying = true;
+    isPlaying.value = true;
   }
 
-  void dispose() {
-    _audioPlayer.dispose();
-  }
+  // Exposed for widgets that need low-level stream access (e.g. seek bar).
+  AudioPlayer get player => _audioPlayer;
+
+  /// No-op kept for API compatibility — the singleton is never truly disposed.
+  void dispose() {}
 }
