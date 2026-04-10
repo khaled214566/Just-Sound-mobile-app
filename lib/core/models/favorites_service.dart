@@ -6,21 +6,16 @@ class FavoritesService {
   static final FavoritesService _instance = FavoritesService._internal();
   static Database? _database;
 
-  factory FavoritesService() {
-    return _instance;
-  }
-
+  factory FavoritesService() => _instance;
   FavoritesService._internal();
 
-  // 🔥 Reactive notifier for favorite file paths
-  final ValueNotifier<Set<String>> favoriteFilePathsNotifier =
-      ValueNotifier<Set<String>>({});
+  final ValueNotifier<Set<String>> favoriteFilePathsNotifier = ValueNotifier(
+    {},
+  );
 
-  // 🔥 Initialize database
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDB();
-    // Load initial favorites into notifier
     await _loadFavoritesIntoNotifier();
     return _database!;
   }
@@ -36,49 +31,87 @@ class FavoritesService {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (db, version) async {
         await db.execute('''
-        CREATE TABLE favorites (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          filePath TEXT UNIQUE NOT NULL,
-          title TEXT NOT NULL,
-          artist TEXT NOT NULL,
-          artwork BLOB,               
-          addedAt INTEGER NOT NULL
-        )
-      ''');
+          CREATE TABLE favorites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filePath TEXT UNIQUE NOT NULL,
+            title TEXT NOT NULL,
+            artist TEXT NOT NULL,
+            artwork BLOB,
+            downloadDate INTEGER NOT NULL
+          )
+        ''');
       },
       onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 2) {
-          await db.execute('ALTER TABLE favorites ADD COLUMN artwork BLOB');
+        if (oldVersion < 3) {
+          // Check whether the old table has an addedAt column (v2 may or may
+          // not have it depending on whether the previous migration ran).
+          final cols = await db.rawQuery(
+            "PRAGMA table_info(favorites)",
+          );
+          final hasAddedAt = cols.any((c) => c['name'] == 'addedAt');
+
+          await db.execute('''
+            CREATE TABLE favorites_temp (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              filePath TEXT UNIQUE NOT NULL,
+              title TEXT NOT NULL,
+              artist TEXT NOT NULL,
+              artwork BLOB,
+              downloadDate INTEGER NOT NULL
+            )
+          ''');
+
+          if (hasAddedAt) {
+            await db.execute('''
+              INSERT INTO favorites_temp (id, filePath, title, artist, artwork, downloadDate)
+              SELECT id, filePath, title, artist, artwork, addedAt FROM favorites
+            ''');
+          } else {
+            await db.execute('''
+              INSERT INTO favorites_temp (id, filePath, title, artist, artwork, downloadDate)
+              SELECT id, filePath, title, artist, artwork, 0 FROM favorites
+            ''');
+          }
+
+          await db.execute('DROP TABLE favorites');
+          await db.execute('ALTER TABLE favorites_temp RENAME TO favorites');
         }
       },
     );
   }
 
-  // 🔥 Add to favorites
   Future<void> addFavorite(Map<String, dynamic> song) async {
     final db = await database;
     try {
+      // ensure downloadDate is an int (milliseconds)
+      int downloadDate;
+      if (song['downloadDate'] is DateTime) {
+        downloadDate =
+            (song['downloadDate'] as DateTime).millisecondsSinceEpoch;
+      } else if (song['downloadDate'] is int) {
+        downloadDate = song['downloadDate'];
+      } else {
+        downloadDate = DateTime.now().millisecondsSinceEpoch;
+      }
+
       await db.insert('favorites', {
         'filePath': song['filePath'],
         'title': song['title'],
         'artist': song['artist'],
         'artwork': song['artwork'],
-        'addedAt': DateTime.now().millisecondsSinceEpoch,
-      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+        'downloadDate': downloadDate,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
 
-      // Update notifier
-      final newSet = Set<String>.from(favoriteFilePathsNotifier.value);
-      newSet.add(song['filePath'] as String);
-      favoriteFilePathsNotifier.value = newSet;
+      // reload notifier from DB to stay in sync
+      await _loadFavoritesIntoNotifier();
     } catch (e) {
       debugPrint('Error adding favorite: $e');
     }
   }
 
-  // 🔥 Remove from favorites
   Future<void> removeFavorite(String filePath) async {
     final db = await database;
     try {
@@ -87,26 +120,19 @@ class FavoritesService {
         where: 'filePath = ?',
         whereArgs: [filePath],
       );
-
-      // Update notifier
-      final newSet = Set<String>.from(favoriteFilePathsNotifier.value);
-      newSet.remove(filePath);
-      favoriteFilePathsNotifier.value = newSet;
+      await _loadFavoritesIntoNotifier();
     } catch (e) {
       debugPrint('Error removing favorite: $e');
     }
   }
 
-  // 🔥 Check if song is favorite (can be used directly from notifier)
-  bool isFavorite(String filePath) {
-    return favoriteFilePathsNotifier.value.contains(filePath);
-  }
+  bool isFavorite(String filePath) =>
+      favoriteFilePathsNotifier.value.contains(filePath);
 
-  // 🔥 Get all favorites (with artwork, etc.)
   Future<List<Map<String, dynamic>>> getAllFavorites() async {
     final db = await database;
     try {
-      final result = await db.query('favorites', orderBy: 'addedAt DESC');
+      final result = await db.query('favorites', orderBy: 'downloadDate DESC');
       return result;
     } catch (e) {
       debugPrint('Error getting favorites: $e');
@@ -114,7 +140,6 @@ class FavoritesService {
     }
   }
 
-  // 🔥 Get favorite file paths only (used internally)
   Future<Set<String>> getFavoriteFilePaths() async {
     final db = await database;
     try {
@@ -126,7 +151,6 @@ class FavoritesService {
     }
   }
 
-  // 🔥 Get favorites count
   Future<int> getFavoritesCount() async {
     final db = await database;
     try {
@@ -140,18 +164,16 @@ class FavoritesService {
     }
   }
 
-  // 🔥 Clear all favorites
   Future<void> clearAllFavorites() async {
     final db = await database;
     try {
       await db.delete('favorites');
-      favoriteFilePathsNotifier.value = {};
+      await _loadFavoritesIntoNotifier();
     } catch (e) {
       debugPrint('Error clearing favorites: $e');
     }
   }
 
-  // 🔥 Close database
   Future<void> closeDatabase() async {
     if (_database != null) {
       await _database!.close();

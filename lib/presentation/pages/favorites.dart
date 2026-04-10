@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:idgaf/core/configs/theme/app_colors.dart';
+import 'package:idgaf/core/models/BottomSheet.dart';
 import 'package:idgaf/core/models/audio_player.dart';
 import 'package:idgaf/core/models/favorites_service.dart';
 
@@ -14,9 +15,11 @@ class _FavoritesPageState extends State<FavoritesPage> {
   final AudioService _audioService = AudioService();
   final FavoritesService _favoritesService = FavoritesService();
 
-  // Cached full list of favorite songs (including artwork)
   List<Map<String, dynamic>> _cachedFavorites = [];
   bool _isLoading = true;
+
+  SortOption _currentSort = SortOption.title;
+  SortBy _currentOrder = SortBy.ascending;
 
   @override
   void initState() {
@@ -25,12 +28,18 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
     _audioService.currentFilePath.addListener(_onAudioStateChanged);
     _audioService.isPlaying.addListener(_onAudioStateChanged);
+    _favoritesService.favoriteFilePathsNotifier.addListener(
+      _onFavoritesChanged,
+    );
   }
 
   @override
   void dispose() {
     _audioService.currentFilePath.removeListener(_onAudioStateChanged);
     _audioService.isPlaying.removeListener(_onAudioStateChanged);
+    _favoritesService.favoriteFilePathsNotifier.removeListener(
+      _onFavoritesChanged,
+    );
     super.dispose();
   }
 
@@ -38,19 +47,59 @@ class _FavoritesPageState extends State<FavoritesPage> {
     if (mounted) setState(() {});
   }
 
+  void _onFavoritesChanged() {
+    _loadFavorites();
+  }
+
   Future<void> _loadFavorites() async {
     final favorites = await _favoritesService.getAllFavorites();
     if (mounted) {
       setState(() {
-        _cachedFavorites = favorites;
+        // Create a mutable copy – the DB returns a read-only list
+        _cachedFavorites = List.from(favorites);
         _isLoading = false;
+        _applySort(); // Re-apply user's sort preference
       });
     }
   }
 
-  // Play a song from the filtered list – we pass the actual song item to the audio service.
+  // Applies the current sort to _cachedFavorites (no setState here)
+  void _applySort() {
+    if (_cachedFavorites.isEmpty) return;
+
+    int compare<T extends Comparable>(T a, T b) =>
+        _currentOrder == SortBy.ascending ? a.compareTo(b) : b.compareTo(a);
+
+    switch (_currentSort) {
+      case SortOption.title:
+        _cachedFavorites.sort(
+          (a, b) => compare(a['title'].toLowerCase(), b['title'].toLowerCase()),
+        );
+        break;
+      case SortOption.artist:
+        _cachedFavorites.sort(
+          (a, b) =>
+              compare(a['artist'].toLowerCase(), b['artist'].toLowerCase()),
+        );
+        break;
+      case SortOption.date:
+        _cachedFavorites.sort(
+          (a, b) => compare(a['downloadDate'] as int, b['downloadDate'] as int),
+        );
+        break;
+    }
+  }
+
+  // Called when the user selects a new sort option
+  void _sortFavorites(SortOption option, SortBy order) {
+    setState(() {
+      _currentSort = option;
+      _currentOrder = order;
+      _applySort();
+    });
+  }
+
   Future<void> _playSong(Map<String, dynamic> song) async {
-    // Find the index of this song in the cached full list for playback queue
     final index = _cachedFavorites.indexWhere(
       (s) => s['filePath'] == song['filePath'],
     );
@@ -59,28 +108,18 @@ class _FavoritesPageState extends State<FavoritesPage> {
     }
   }
 
-  // Remove favorite using filePath to avoid index confusion
   Future<void> _removeFavorite(String filePath) async {
-    // Optimistic UI update: remove from cached list immediately
-    setState(() {
-      _cachedFavorites.removeWhere((song) => song['filePath'] == filePath);
-    });
-
-    // Show feedback
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Removed from favorites'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-
     try {
       await _favoritesService.removeFavorite(filePath);
-      // The notifier will update automatically, but our cached list already
-      // reflects the change, so we don't need to reload.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Removed from favorites'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
-      // Rollback on failure: reload from DB
-      await _loadFavorites();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -108,17 +147,24 @@ class _FavoritesPageState extends State<FavoritesPage> {
       appBar: AppBar(
         title: const Text("Favorites"),
         automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.sort),
+            onPressed: () async {
+              final result = await showSortFilterSheet(
+                context,
+                initialSort: _currentSort,
+                initialWay: _currentOrder,
+              );
+              if (result != null) {
+                _sortFavorites(result.sortBy, result.genre);
+              }
+            },
+          ),
+        ],
       ),
-      body: ValueListenableBuilder<Set<String>>(
-        valueListenable: _favoritesService.favoriteFilePathsNotifier,
-        builder: (context, favoritePaths, _) {
-          // Filter cached list based on current favorite paths
-          final filteredFavorites = _cachedFavorites
-              .where((song) => favoritePaths.contains(song['filePath']))
-              .toList();
-
-          if (filteredFavorites.isEmpty) {
-            return Center(
+      body: _cachedFavorites.isEmpty
+          ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -134,79 +180,75 @@ class _FavoritesPageState extends State<FavoritesPage> {
                   ),
                 ],
               ),
-            );
-          }
+            )
+          : ListView.builder(
+              itemCount: _cachedFavorites.length,
+              itemBuilder: (context, index) {
+                final song = _cachedFavorites[index];
+                final String? playingPath = _audioService.currentFilePath.value;
+                final bool isSelected =
+                    playingPath != null && playingPath == song['filePath'];
 
-          return ListView.builder(
-            itemCount: filteredFavorites.length,
-            itemBuilder: (context, index) {
-              final song = filteredFavorites[index];
-              final String? playingPath = _audioService.currentFilePath.value;
-              final bool isSelected =
-                  playingPath != null && playingPath == song['filePath'];
-
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.only(left: 10, right: 4),
-                  onTap: () => _playSong(song),
-                  shape: isSelected
-                      ? ContinuousRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          side: BorderSide(
-                            color: AppColors.lightBlue,
-                            width: 2,
-                          ),
-                        )
-                      : null,
-                  leading: song['artwork'] != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.memory(
-                            song['artwork'],
-                            width: 50,
-                            height: 50,
-                            fit: BoxFit.cover,
-                          ),
-                        )
-                      : ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            width: 50,
-                            height: 50,
-                            color: Colors.grey[800],
-                            child: const Icon(
-                              Icons.music_note,
-                              color: Colors.white54,
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.only(left: 10, right: 4),
+                    onTap: () => _playSong(song),
+                    shape: isSelected
+                        ? ContinuousRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            side: BorderSide(
+                              color: AppColors.lightBlue,
+                              width: 2,
+                            ),
+                          )
+                        : null,
+                    leading: song['artwork'] != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.memory(
+                              song['artwork'],
+                              width: 50,
+                              height: 50,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              width: 50,
+                              height: 50,
+                              color: Colors.grey[800],
+                              child: const Icon(
+                                Icons.music_note,
+                                color: Colors.white54,
+                              ),
                             ),
                           ),
-                        ),
-                  title: Text(
-                    song['title'],
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: isSelected ? Colors.blue : null,
+                    title: Text(
+                      song['title'],
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: isSelected ? Colors.blue : null,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    subtitle: Text(
+                      song['artist'],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.favorite, color: Colors.red),
+                      onPressed: () => _removeFavorite(song['filePath']),
+                    ),
+                    selected: isSelected,
+                    selectedTileColor: Colors.grey[850],
                   ),
-                  subtitle: Text(
-                    song['artist'],
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.favorite, color: Colors.red),
-                    onPressed: () => _removeFavorite(song['filePath']),
-                  ),
-                  selected: isSelected,
-                  selectedTileColor: Colors.grey[850],
-                ),
-              );
-            },
-          );
-        },
-      ),
+                );
+              },
+            ),
     );
   }
 }
