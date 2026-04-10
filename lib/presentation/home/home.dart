@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:idgaf/core/configs/assets/app_vectors.dart';
+import 'package:idgaf/core/models/audio_player.dart';
+import 'package:idgaf/core/models/miniPlayer.dart';
 import 'package:idgaf/presentation/pages/songs_page.dart';
+import 'package:idgaf/presentation/pages/favorites.dart';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -14,9 +17,10 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
   int _selectedIndex = 0;
   late List<AnimationController> _scaleControllers;
   late List<Animation<double>> _scaleAnimations;
+
   final List<Widget> _pages = const [
     SongsPage(),
-    Center(child: Text('Favorites Page')),
+    FavoritesPage(),
     Center(child: Text('Playlists Page')),
     Center(child: Text('Converter Page')),
   ];
@@ -24,7 +28,6 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    // Initialize animation controllers for each navigation item
     _scaleControllers = List.generate(
       4,
       (index) => AnimationController(
@@ -40,7 +43,6 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
       ).animate(CurvedAnimation(parent: controller, curve: Curves.easeInOut));
     }).toList();
 
-    // Play animation for initially selected item
     _scaleControllers[_selectedIndex].forward();
   }
 
@@ -53,10 +55,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
   }
 
   void _onNavItemTapped(int index) {
-    // Reverse the previous selection
     _scaleControllers[_selectedIndex].reverse();
-
-    // Forward the new selection
     _scaleControllers[index].forward();
 
     setState(() {
@@ -67,13 +66,25 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_selectedIndex],
+      body: Column(
+        children: [
+          Expanded(
+            child: IndexedStack(index: _selectedIndex, children: _pages),
+          ),
+          ValueListenableBuilder<List<Map<String, dynamic>>>(
+            valueListenable: AudioService().currentQueue,
+            builder: (context, queue, _) {
+              if (queue.isEmpty) return const SizedBox.shrink();
+              return MiniPlayer(songs: queue);
+            },
+          ),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onNavItemTapped,
         selectedItemColor: const Color(0xff88D3EC),
         selectedLabelStyle: const TextStyle(
-          // Color when selected
           fontSize: 12,
           fontWeight: FontWeight.bold,
         ),
@@ -121,21 +132,5 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
         ],
       ),
     );
-  }
-
-  // ignore: unused_element
-  String _getPageTitle(int index) {
-    switch (index) {
-      case 0:
-        return 'Songs';
-      case 1:
-        return 'Favorites';
-      case 2:
-        return 'Playlists';
-      case 3:
-        return 'Converter';
-      default:
-        return 'Home';
-    }
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
@@ -11,11 +12,22 @@ class FavoritesService {
 
   FavoritesService._internal();
 
+  // 🔥 Reactive notifier for favorite file paths
+  final ValueNotifier<Set<String>> favoriteFilePathsNotifier =
+      ValueNotifier<Set<String>>({});
+
   // 🔥 Initialize database
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDB();
+    // Load initial favorites into notifier
+    await _loadFavoritesIntoNotifier();
     return _database!;
+  }
+
+  Future<void> _loadFavoritesIntoNotifier() async {
+    final paths = await getFavoriteFilePaths();
+    favoriteFilePathsNotifier.value = paths;
   }
 
   Future<Database> _initDB() async {
@@ -24,17 +36,23 @@ class FavoritesService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
-          CREATE TABLE favorites (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            filePath TEXT UNIQUE NOT NULL,
-            title TEXT NOT NULL,
-            artist TEXT NOT NULL,
-            addedAt INTEGER NOT NULL
-          )
-          ''');
+        CREATE TABLE favorites (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          filePath TEXT UNIQUE NOT NULL,
+          title TEXT NOT NULL,
+          artist TEXT NOT NULL,
+          artwork BLOB,               
+          addedAt INTEGER NOT NULL
+        )
+      ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('ALTER TABLE favorites ADD COLUMN artwork BLOB');
+        }
       },
     );
   }
@@ -47,10 +65,16 @@ class FavoritesService {
         'filePath': song['filePath'],
         'title': song['title'],
         'artist': song['artist'],
+        'artwork': song['artwork'],
         'addedAt': DateTime.now().millisecondsSinceEpoch,
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
+
+      // Update notifier
+      final newSet = Set<String>.from(favoriteFilePathsNotifier.value);
+      newSet.add(song['filePath'] as String);
+      favoriteFilePathsNotifier.value = newSet;
     } catch (e) {
-      print('Error adding favorite: $e');
+      debugPrint('Error adding favorite: $e');
     }
   }
 
@@ -63,47 +87,41 @@ class FavoritesService {
         where: 'filePath = ?',
         whereArgs: [filePath],
       );
+
+      // Update notifier
+      final newSet = Set<String>.from(favoriteFilePathsNotifier.value);
+      newSet.remove(filePath);
+      favoriteFilePathsNotifier.value = newSet;
     } catch (e) {
-      print('Error removing favorite: $e');
+      debugPrint('Error removing favorite: $e');
     }
   }
 
-  // 🔥 Check if song is favorite
-  Future<bool> isFavorite(String filePath) async {
-    final db = await database;
-    try {
-      final result = await db.query(
-        'favorites',
-        where: 'filePath = ?',
-        whereArgs: [filePath],
-      );
-      return result.isNotEmpty;
-    } catch (e) {
-      print('Error checking favorite: $e');
-      return false;
-    }
+  // 🔥 Check if song is favorite (can be used directly from notifier)
+  bool isFavorite(String filePath) {
+    return favoriteFilePathsNotifier.value.contains(filePath);
   }
 
-  // 🔥 Get all favorites
+  // 🔥 Get all favorites (with artwork, etc.)
   Future<List<Map<String, dynamic>>> getAllFavorites() async {
     final db = await database;
     try {
       final result = await db.query('favorites', orderBy: 'addedAt DESC');
       return result;
     } catch (e) {
-      print('Error getting favorites: $e');
+      debugPrint('Error getting favorites: $e');
       return [];
     }
   }
 
-  // 🔥 Get favorite IDs (for quick checking in ListView)
+  // 🔥 Get favorite file paths only (used internally)
   Future<Set<String>> getFavoriteFilePaths() async {
     final db = await database;
     try {
       final result = await db.query('favorites', columns: ['filePath']);
       return result.map((row) => row['filePath'] as String).toSet();
     } catch (e) {
-      print('Error getting favorite file paths: $e');
+      debugPrint('Error getting favorite file paths: $e');
       return {};
     }
   }
@@ -117,7 +135,7 @@ class FavoritesService {
       );
       return Sqflite.firstIntValue(result) ?? 0;
     } catch (e) {
-      print('Error getting favorites count: $e');
+      debugPrint('Error getting favorites count: $e');
       return 0;
     }
   }
@@ -127,8 +145,9 @@ class FavoritesService {
     final db = await database;
     try {
       await db.delete('favorites');
+      favoriteFilePathsNotifier.value = {};
     } catch (e) {
-      print('Error clearing favorites: $e');
+      debugPrint('Error clearing favorites: $e');
     }
   }
 

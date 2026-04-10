@@ -6,6 +6,7 @@ import 'package:just_audio/just_audio.dart';
 class AudioService {
   // ─── Singleton ────────────────────────────────────────────────────────────
   static final AudioService _instance = AudioService._internal();
+
   factory AudioService() => _instance;
   AudioService._internal() {
     _audioPlayer.playerStateStream.listen((state) {
@@ -21,11 +22,15 @@ class AudioService {
 
   // ─── State (observable so the UI can react) ───────────────────────────────
   /// File path of the currently active song. `null` means nothing loaded.
-  /// UI should use this to highlight the correct tile.
   final ValueNotifier<String?> currentFilePath = ValueNotifier<String?>(null);
 
   /// True while the player is actively playing.
   final ValueNotifier<bool> isPlaying = ValueNotifier<bool>(false);
+
+  /// 🔥 Holds the current playlist for the MiniPlayer
+  final ValueNotifier<List<Map<String, dynamic>>> currentQueue = ValueNotifier(
+    [],
+  );
 
   // ─── Internal index for playback control ─────────────────────────────────
   int _currentIndex = -1;
@@ -50,6 +55,9 @@ class AudioService {
 
     // Update the file path notifier (handles the case where the song was removed)
     _syncFilePathFromIndex();
+
+    // 🔥 Notify listeners about the new queue
+    currentQueue.value = List.unmodifiable(_queue);
   }
 
   // ─── Playback ─────────────────────────────────────────────────────────────
@@ -78,6 +86,8 @@ class AudioService {
     _queue = List<Map<String, dynamic>>.from(songs);
     _currentIndex = index;
     _syncFilePathFromIndex();
+    // 🔥 Update the queue notifier
+    currentQueue.value = List.unmodifiable(_queue);
     await _playCurrent();
   }
 

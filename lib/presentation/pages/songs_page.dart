@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:idgaf/core/configs/assets/app_vectors.dart';
+import 'package:idgaf/core/configs/theme/app_colors.dart';
 import 'package:idgaf/core/models/search_delegate.dart';
 import 'package:idgaf/core/models/audio_player.dart';
 import 'package:idgaf/core/models/files_loader.dart';
@@ -9,7 +10,6 @@ import 'package:idgaf/core/models/permission.dart';
 import 'package:idgaf/core/models/favorites_service.dart';
 import 'package:idgaf/presentation/choose_mode/bloc/theme_cubit.dart';
 import 'package:idgaf/core/models/BottomSheet.dart';
-import 'package:idgaf/core/models/miniPlayer.dart';
 
 class SongsPage extends StatefulWidget {
   const SongsPage({super.key});
@@ -19,14 +19,12 @@ class SongsPage extends StatefulWidget {
 }
 
 class _SongsPageState extends State<SongsPage> {
-  // Singleton — never recreated across rebuilds / navigation
   final AudioService _audioService = AudioService();
   final FavoritesService _favoritesService = FavoritesService();
 
   List<Map<String, dynamic>> _songs = [];
   bool _isLoading = true;
   String _debugMessage = 'Loading...';
-  Set<String> _favorites = {};
 
   SortOption _currentSort = SortOption.title;
   SortBy _currentOrder = SortBy.ascending;
@@ -36,8 +34,6 @@ class _SongsPageState extends State<SongsPage> {
     super.initState();
     _initialize();
 
-    // Rebuild the list whenever the playing song changes so the blue
-    // highlight moves to the correct tile.
     _audioService.currentFilePath.addListener(_onAudioStateChanged);
     _audioService.isPlaying.addListener(_onAudioStateChanged);
   }
@@ -46,16 +42,12 @@ class _SongsPageState extends State<SongsPage> {
   void dispose() {
     _audioService.currentFilePath.removeListener(_onAudioStateChanged);
     _audioService.isPlaying.removeListener(_onAudioStateChanged);
-    // Do NOT call _audioService.dispose() — it's a singleton.
     super.dispose();
   }
 
   void _onAudioStateChanged() {
-    // Just trigger a rebuild; the ValueListenable does the heavy lifting.
     if (mounted) setState(() {});
   }
-
-  // ── Load songs + favorites ────────────────────────────────────────────────
 
   Future<void> _initialize() async {
     final granted = await PermissionService.requestStoragePermissions();
@@ -69,19 +61,18 @@ class _SongsPageState extends State<SongsPage> {
     }
 
     final songs = await SongLoader.loadSongs();
-    final favoritePaths = await _favoritesService.getFavoriteFilePaths();
 
     setState(() {
       _songs = songs;
-      _favorites = favoritePaths;
       _isLoading = false;
       _debugMessage = songs.isEmpty
           ? 'No MP3 files found'
           : 'Loaded ${songs.length} songs';
     });
-  }
 
-  // ── Sorting ───────────────────────────────────────────────────────────────
+    // Update the audio service queue
+    _audioService.setQueue(_songs);
+  }
 
   void _sortSongs(SortOption option, SortBy order) {
     setState(() {
@@ -115,28 +106,21 @@ class _SongsPageState extends State<SongsPage> {
     });
   }
 
-  // ── Play ──────────────────────────────────────────────────────────────────
-
   Future<void> _playSong(int index) async {
     await _audioService.playFromList(_songs, index);
   }
 
-  // ── Favorites ─────────────────────────────────────────────────────────────
-
-  Future<void> _toggleFavorite(int index) async {
-    final song = _songs[index];
-    final filePath = song['filePath'] as String;
-
-    if (_favorites.contains(filePath)) {
+  Future<void> _toggleFavorite(
+    String filePath,
+    Map<String, dynamic> song,
+  ) async {
+    if (_favoritesService.isFavorite(filePath)) {
       await _favoritesService.removeFavorite(filePath);
-      setState(() => _favorites.remove(filePath));
     } else {
       await _favoritesService.addFavorite(song);
-      setState(() => _favorites.add(filePath));
     }
+    // No setState needed — the ValueListenableBuilder will handle it
   }
-
-  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -199,69 +183,82 @@ class _SongsPageState extends State<SongsPage> {
           ),
         ],
       ),
+      body: ValueListenableBuilder<Set<String>>(
+        valueListenable: _favoritesService.favoriteFilePathsNotifier,
+        builder: (context, favoritePaths, _) {
+          return ListView.builder(
+            itemCount: _songs.length,
+            itemBuilder: (context, index) {
+              final song = _songs[index];
+              final String? playingPath = _audioService.currentFilePath.value;
+              final bool isSelected =
+                  playingPath != null && playingPath == song['filePath'];
+              final bool isFavorite = favoritePaths.contains(song['filePath']);
 
-      bottomNavigationBar: MiniPlayer(songs: _songs),
-
-      body: ListView.builder(
-        itemCount: _songs.length,
-        itemBuilder: (context, index) {
-          final song = _songs[index];
-          final String? playingPath = _audioService.currentFilePath.value;
-          final bool isSelected =
-              playingPath != null && playingPath == song['filePath'];
-          final bool isFavorite = _favorites.contains(song['filePath']);
-
-          return ListTile(
-            onTap: () => _playSong(index),
-
-            leading: song['artwork'] != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.memory(
-                      song['artwork'],
-                      width: 50,
-                      height: 50,
-                      fit: BoxFit.cover,
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.only(left: 10, right: 4),
+                  onTap: () => _playSong(index),
+                  shape: isSelected
+                      ? ContinuousRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          side: BorderSide(
+                            color: AppColors.lightBlue,
+                            width: 2,
+                          ),
+                        )
+                      : null,
+                  leading: song['artwork'] != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.memory(
+                            song['artwork'],
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : (context.watch<ThemeCubit>().state == ThemeMode.light)
+                      ? SvgPicture.asset(
+                          AppVectors.songLogo_light,
+                          width: 50,
+                          height: 50,
+                        )
+                      : SvgPicture.asset(
+                          AppVectors.songLogo_dark,
+                          width: 50,
+                          height: 50,
+                        ),
+                  title: Text(
+                    song['title'],
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? AppColors.lightBlue : null,
                     ),
-                  )
-                : (context.watch<ThemeCubit>().state == ThemeMode.light)
-                ? SvgPicture.asset(
-                    AppVectors.songLogo_light,
-                    width: 50,
-                    height: 50,
-                  )
-                : SvgPicture.asset(
-                    AppVectors.songLogo_dark,
-                    width: 50,
-                    height: 50,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-
-            title: Text(
-              song['title'],
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                // Blue title for the currently selected / playing song
-                color: isSelected ? Colors.blue : null,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Text(
-              song['artist'],
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-
-            trailing: IconButton(
-              icon: Icon(
-                isFavorite ? Icons.favorite : Icons.favorite_border,
-                color: isFavorite ? Colors.red : null,
-              ),
-              onPressed: () => _toggleFavorite(index),
-            ),
-
-            selected: isSelected,
-            selectedTileColor: Colors.grey[850],
+                  subtitle: Text(
+                    song['artist'],
+                    style: TextStyle(
+                      color: isSelected ? AppColors.lightBlue : null,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: IconButton(
+                    icon: Icon(
+                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: isFavorite ? Colors.red : null,
+                    ),
+                    onPressed: () => _toggleFavorite(song['filePath'], song),
+                  ),
+                  selected: isSelected,
+                  selectedTileColor: AppColors.primary,
+                ),
+              );
+            },
           );
         },
       ),
