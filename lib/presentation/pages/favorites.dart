@@ -229,13 +229,16 @@ class _FavoritesPageState extends State<FavoritesPage> {
                       song['title'],
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
-                        color: isSelected ? Colors.blue : null,
+                        color: isSelected ? AppColors.lightBlue : null,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     subtitle: Text(
                       song['artist'],
+                      style: TextStyle(
+                        color: isSelected ? AppColors.lightBlue : null,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -244,7 +247,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                       onPressed: () => _removeFavorite(song['filePath']),
                     ),
                     selected: isSelected,
-                    selectedTileColor: Colors.grey[850],
+                    selectedTileColor: AppColors.primary,
                   ),
                 );
               },

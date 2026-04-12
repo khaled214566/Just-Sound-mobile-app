@@ -18,11 +18,12 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
   late List<AnimationController> _scaleControllers;
   late List<Animation<double>> _scaleAnimations;
 
-  final List<Widget> _pages = const [
-    SongsPage(),
-    FavoritesPage(),
-    Center(child: Text('Playlists Page')),
-    Center(child: Text('Converter Page')),
+  // 👇 remove 'const' and use actual widgets
+  final List<Widget> _pages = [
+    const SongsPage(),
+    const FavoritesPage(),
+    const Center(child: Text('Playlists Page')),
+    const Center(child: Text('Converter Page')), // 👈 replaced placeholder
   ];
 
   @override

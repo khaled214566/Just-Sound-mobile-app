@@ -84,8 +84,16 @@ class MySearchDelegate extends SearchDelegate {
                       width: 50,
                       height: 50,
                     ),
-              title: Text(song['title']),
-              subtitle: Text('${song['artist']} • ${song['album']}'),
+              title: Text(
+                song['title'],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                '${song['artist']} • ${song['album']}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
               onTap: () {
                 // Handle song selection
                 close(context, song);
@@ -161,8 +169,16 @@ class MySearchDelegate extends SearchDelegate {
                       width: 50,
                       height: 50,
                     ),
-              title: Text(song['title']),
-              subtitle: Text('${song['artist']} • ${song['album']}'),
+              title: Text(
+                song['title'],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                '${song['artist']} • ${song['album']}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
               onTap: () {
                 // Handle song selection
               },
