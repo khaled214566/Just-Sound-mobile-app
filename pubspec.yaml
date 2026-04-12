@@ -44,6 +44,14 @@ dependencies:
   audio_metadata_reader: 
   sqflite: ^2.3.0
   path: ^1.8.0
+  youtube_explode_dart: ^2.2.0
+
+  hive_flutter: ^1.1.0
+  audiotags: 
+  http: ^1.2.0
+
+  hive_generator: ^2.0.1
+  build_runner: ^2.4.9
 dev_dependencies:
   flutter_test:
     sdk: flutter

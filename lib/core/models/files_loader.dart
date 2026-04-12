@@ -3,66 +3,80 @@ import 'dart:typed_data';
 import 'package:audio_metadata_reader/audio_metadata_reader.dart';
 
 class SongLoader {
-  static Future<List<Map<String, dynamic>>> loadSongs() async {
-    List<Map<String, dynamic>> songsList = [];
+  /// Directories scanned for local audio files.
+  /// Must include [DownloadManager.saveDirectory] so downloaded tracks appear.
+  static const List<String> dirsToSearch = [
+    '/storage/emulated/0/Download',
+    // '/storage/emulated/0/Music',
+    // '/sdcard/Download',
+  ];
 
-    final dirsToSearch = [
-      // "/storage/emulated/0/Music",
-      "/storage/emulated/0/Download",
-      // "/sdcard/Music",
-      // "/sdcard/Download",
-    ];
+  /// Audio extensions to include.
+  static const List<String> _extensions = ['.mp3', '.m4a'];
+
+  static Future<List<Map<String, dynamic>>> loadSongs() async {
+    final List<Map<String, dynamic>> songsList = [];
 
     for (final dirPath in dirsToSearch) {
       final dir = Directory(dirPath);
+      if (!dir.existsSync()) continue;
 
-      if (dir.existsSync()) {
-        try {
-          final files = dir
-              .listSync(recursive: false)
-              .whereType<File>()
-              .where((file) => file.path.toLowerCase().endsWith('.mp3'))
-              .toList();
+      try {
+        final files = dir.listSync(recursive: false).whereType<File>().where((
+          file,
+        ) {
+          final lower = file.path.toLowerCase();
+          return _extensions.any((ext) => lower.endsWith(ext));
+        }).toList();
 
-          for (var file in files) {
-            final fileName = file.path.split('/').last;
+        for (final file in files) {
+          final fileName = file.path.split('/').last;
+          final ext = _extensions.firstWhere(
+            (e) => fileName.toLowerCase().endsWith(e),
+            orElse: () => '',
+          );
+          final titleFallback = ext.isNotEmpty
+              ? fileName.substring(0, fileName.length - ext.length)
+              : fileName;
 
-            try {
-              final metadata = await readMetadata(file, getImage: true);
+          try {
+            final metadata = await readMetadata(file, getImage: true);
 
-              Uint8List? art;
-              if (metadata.pictures.isNotEmpty) {
-                art = metadata.pictures.first.bytes;
-              }
-
-              songsList.add({
-                'filePath': file.path,
-                'fileName': fileName,
-                'title': metadata.title ?? fileName.replaceAll('.mp3', ''),
-                'artist': metadata.artist ?? 'Unknown Artist',
-                'album': metadata.album ?? 'Unknown Album',
-                'duration': metadata.duration?.inMilliseconds ?? 0,
-                'artwork': art,
-                'downloadDate': DateTime.fromMillisecondsSinceEpoch(
-                  file.lastModifiedSync().millisecondsSinceEpoch,
-                ),
-              });
-            } catch (e) {
-              songsList.add({
-                'filePath': file.path,
-                'fileName': fileName,
-                'title': fileName.replaceAll('.mp3', ''),
-                'artist': 'Unknown Artist',
-                'album': 'Unknown Album',
-                'duration': 0,
-                'artwork': null,
-                'downloadDate': DateTime.fromMillisecondsSinceEpoch(
-                  file.lastModifiedSync().millisecondsSinceEpoch,
-                ),
-              });
+            Uint8List? art;
+            if (metadata.pictures.isNotEmpty) {
+              art = metadata.pictures.first.bytes;
             }
+
+            songsList.add({
+              'filePath': file.path,
+              'fileName': fileName,
+              'title': metadata.title ?? titleFallback,
+              'artist': metadata.artist ?? 'Unknown Artist',
+              'album': metadata.album ?? 'Unknown Album',
+              'duration': metadata.duration?.inMilliseconds ?? 0,
+              'artwork': art,
+              'downloadDate': DateTime.fromMillisecondsSinceEpoch(
+                file.lastModifiedSync().millisecondsSinceEpoch,
+              ),
+            });
+          } catch (_) {
+            // Metadata read failed — still include the file with fallback values
+            songsList.add({
+              'filePath': file.path,
+              'fileName': fileName,
+              'title': titleFallback,
+              'artist': 'Unknown Artist',
+              'album': 'Unknown Album',
+              'duration': 0,
+              'artwork': null,
+              'downloadDate': DateTime.fromMillisecondsSinceEpoch(
+                file.lastModifiedSync().millisecondsSinceEpoch,
+              ),
+            });
           }
-        } catch (_) {}
+        }
+      } catch (_) {
+        // Directory read failed — skip silently
       }
     }
 

@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:idgaf/core/configs/assets/app_vectors.dart';
 import 'package:idgaf/core/models/audio_player.dart';
 import 'package:idgaf/core/models/miniPlayer.dart';
+import 'package:idgaf/presentation/pages/converter.dart';
 import 'package:idgaf/presentation/pages/songs_page.dart';
 import 'package:idgaf/presentation/pages/favorites.dart';
 
@@ -23,7 +24,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
     const SongsPage(),
     const FavoritesPage(),
     const Center(child: Text('Playlists Page')),
-    const Center(child: Text('Converter Page')), // 👈 replaced placeholder
+    const DownloadPage(), // 👈 replaced placeholder
   ];
 
   @override
