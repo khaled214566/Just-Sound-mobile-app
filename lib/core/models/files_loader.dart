@@ -2,6 +2,56 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:audio_metadata_reader/audio_metadata_reader.dart';
 
+Future<Map<String, dynamic>> getSongMetadata(String filePath) async {
+  final file = File(filePath);
+  if (!file.existsSync()) {
+    throw Exception('File not found: $filePath');
+  }
+
+  final fileName = filePath.split('/').last;
+  final ext = fileName.contains('.')
+      ? fileName.substring(fileName.lastIndexOf('.'))
+      : '';
+  final titleFallback = ext.isNotEmpty
+      ? fileName.substring(0, fileName.length - ext.length)
+      : fileName;
+
+  try {
+    final metadata = await readMetadata(file, getImage: true);
+    Uint8List? art;
+    if (metadata.pictures.isNotEmpty) {
+      art = metadata.pictures.first.bytes;
+    }
+
+    return {
+      'filePath': filePath,
+      'fileName': fileName,
+      'title': metadata.title ?? titleFallback,
+      'artist': metadata.artist ?? 'Unknown Artist',
+      'album': metadata.album ?? 'Unknown Album',
+      'duration': metadata.duration?.inMilliseconds ?? 0,
+      'artwork': art,
+      'downloadDate': DateTime.fromMillisecondsSinceEpoch(
+        file.lastModifiedSync().millisecondsSinceEpoch,
+      ),
+    };
+  } catch (_) {
+    // Fallback if metadata reading fails
+    return {
+      'filePath': filePath,
+      'fileName': fileName,
+      'title': titleFallback,
+      'artist': 'Unknown Artist',
+      'album': 'Unknown Album',
+      'duration': 0,
+      'artwork': null,
+      'downloadDate': DateTime.fromMillisecondsSinceEpoch(
+        file.lastModifiedSync().millisecondsSinceEpoch,
+      ),
+    };
+  }
+}
+
 class SongLoader {
   /// Directories scanned for local audio files.
   /// Must include [DownloadManager.saveDirectory] so downloaded tracks appear.
