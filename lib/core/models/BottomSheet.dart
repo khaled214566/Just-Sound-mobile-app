@@ -21,8 +21,8 @@ class SortFilterResult {
 /// (or `null` if the user dismisses without applying).
 Future<SortFilterResult?> showSortFilterSheet(
   BuildContext context, {
-  SortOption initialSort = SortOption.title,
-  SortBy initialWay = SortBy.ascending,
+  SortOption initialSort = SortOption.date,
+  SortBy initialWay = SortBy.descending,
 }) {
   return showModalBottomSheet<SortFilterResult>(
     context: context,
@@ -43,8 +43,8 @@ class SortFilterBottomSheet extends StatefulWidget {
 
   const SortFilterBottomSheet({
     super.key,
-    this.initialSort = SortOption.title,
-    this.initialWay = SortBy.ascending,
+    this.initialSort = SortOption.date,
+    this.initialWay = SortBy.descending,
   });
 
   @override
