@@ -26,8 +26,8 @@ class _SongsPageState extends State<SongsPage> {
   bool _isLoading = true;
   String _debugMessage = 'Loading...';
 
-  SortOption _currentSort = SortOption.title;
-  SortBy _currentOrder = SortBy.ascending;
+  SortOption _currentSort = SortOption.date;
+  SortBy _currentOrder = SortBy.descending;
 
   @override
   void initState() {
@@ -72,6 +72,7 @@ class _SongsPageState extends State<SongsPage> {
 
     // Update the audio service queue
     _audioService.setQueue(_songs);
+    _sortSongs(_currentSort, _currentOrder);
   }
 
   void _sortSongs(SortOption option, SortBy order) {
@@ -128,6 +129,7 @@ class _SongsPageState extends State<SongsPage> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Just Sound'),
+          backgroundColor: AppColors.darkGrey,
           automaticallyImplyLeading: false,
         ),
         body: Center(
@@ -147,6 +149,7 @@ class _SongsPageState extends State<SongsPage> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Just Sound'),
+          backgroundColor: AppColors.darkGrey,
           automaticallyImplyLeading: false,
         ),
         body: Center(child: Text(_debugMessage)),
@@ -156,8 +159,21 @@ class _SongsPageState extends State<SongsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Just Sound'),
+        backgroundColor: AppColors.darkGrey,
         automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _isLoading
+                ? null
+                : () async {
+                    setState(() {
+                      _isLoading = true;
+                      _debugMessage = 'Scanning...';
+                    });
+                    await _initialize();
+                  },
+          ),
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {

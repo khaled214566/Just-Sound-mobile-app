@@ -18,8 +18,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
   List<Map<String, dynamic>> _cachedFavorites = [];
   bool _isLoading = true;
 
-  SortOption _currentSort = SortOption.title;
-  SortBy _currentOrder = SortBy.ascending;
+  SortOption _currentSort = SortOption.date;
+  SortBy _currentOrder = SortBy.descending;
 
   @override
   void initState() {
@@ -137,6 +137,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
       return Scaffold(
         appBar: AppBar(
           title: const Text("Favorites"),
+          backgroundColor: AppColors.darkGrey,
           automaticallyImplyLeading: false,
         ),
         body: const Center(child: CircularProgressIndicator()),
@@ -146,6 +147,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Favorites"),
+        backgroundColor: AppColors.darkGrey,
         automaticallyImplyLeading: false,
         actions: [
           IconButton(

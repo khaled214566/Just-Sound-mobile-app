@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:idgaf/core/models/downloader.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:idgaf/core/configs/theme/app_colors.dart';
 
 class DownloadPage extends StatefulWidget {
   const DownloadPage({super.key});
@@ -50,75 +51,79 @@ class _DownloadPageState extends State<DownloadPage> {
   // ── Download trigger ───────────────────────────────────────────────────────
 
   Future<void> _onDownload() async {
-  if (_dm == null) {
-    setState(() => _error = 'Download manager not ready. Please wait...');
-    return;
-  }
-  
-  final videoId = _extractVideoId(_controller.text);
-  if (videoId == null) {
-    setState(() => _error = 'Invalid YouTube URL or video ID.');
-    return;
-  }
+    if (_dm == null) {
+      setState(() => _error = 'Download manager not ready. Please wait...');
+      return;
+    }
 
-  // Check if already downloaded
-  if (await _dm!.isDownloaded(videoId)) {
-    setState(() => _error = 'This song is already downloaded.');
-    return;
-  }
+    final videoId = _extractVideoId(_controller.text);
+    if (videoId == null) {
+      setState(() => _error = 'Invalid YouTube URL or video ID.');
+      return;
+    }
 
-  setState(() {
-    _loading = true;
-    _error = null;
-  });
+    // Check if already downloaded
+    if (await _dm!.isDownloaded(videoId)) {
+      setState(() => _error = 'This song is already downloaded.');
+      return;
+    }
 
-  try {
-    // Fetch metadata so the file gets a proper title / tags
-    final video = await _yt.videos.get(videoId);
-    final song = {
-      'videoId': videoId,
-      'title': video.title,
-      'artist': video.author,
-      'album': 'YouTube',
-      'thumbnailUrl': video.thumbnails.standardResUrl,
-      'quality': 'high',
-    };
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
 
-    await _dm!.downloadSong(song);
-    _controller.clear();
-    
-    // Show success message
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Download started')),
+    try {
+      // Fetch metadata so the file gets a proper title / tags
+      final video = await _yt.videos.get(videoId);
+      final song = {
+        'videoId': videoId,
+        'title': video.title,
+        'artist': video.author,
+        'album': 'YouTube',
+        'thumbnailUrl': video.thumbnails.standardResUrl,
+        'quality': 'high',
+      };
+
+      await _dm!.downloadSong(song);
+      _controller.clear();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Download started')));
+      }
+    } on VideoUnavailableException {
+      setState(() => _error = 'Video is unavailable or restricted.');
+    } on YoutubeExplodeException catch (e) {
+      setState(() => _error = 'YouTube error: ${e.message}');
+    } catch (e) {
+      setState(
+        () => _error =
+            'Could not fetch video info. Check the URL and your internet connection.',
       );
-    }
-  } on VideoUnavailableException {
-    setState(() => _error = 'Video is unavailable or restricted.');
-  } on YoutubeExplodeException catch (e) {
-    setState(() => _error = 'YouTube error: ${e.message}');
-  } catch (e) {
-    setState(() => _error = 'Could not fetch video info. Check the URL and your internet connection.');
-    debugPrint('Download error: $e');
-  } finally {
-    if (mounted) {
-      setState(() => _loading = false);
+      debugPrint('Download error: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
-}
   // ── UI ─────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
+      backgroundColor: AppColors.darkBackground,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.darkGrey,
         elevation: 0,
+        automaticallyImplyLeading: false,
         title: const Text(
           'Download',
           style: TextStyle(
-            color: Color(0xFFEEEEEE),
+            color: AppColors.lightBackground,
             fontSize: 18,
             fontWeight: FontWeight.w500,
             letterSpacing: 0.2,
@@ -150,8 +155,8 @@ class _DownloadPageState extends State<DownloadPage> {
           // URL field
           TextField(
             controller: _controller,
-            style: const TextStyle(color: Color(0xFFEEEEEE), fontSize: 14),
-            cursorColor: const Color(0xFFFF0000),
+            style: const TextStyle(color: AppColors.primary, fontSize: 14),
+            cursorColor: AppColors.lightBlue,
             decoration: InputDecoration(
               hintText: 'Paste YouTube URL or video ID…',
               hintStyle: const TextStyle(
@@ -190,7 +195,7 @@ class _DownloadPageState extends State<DownloadPage> {
             const SizedBox(height: 8),
             Text(
               _error!,
-              style: const TextStyle(color: Color(0xFFFF4444), fontSize: 12),
+              style: const TextStyle(color: AppColors.lightBlue, fontSize: 12),
             ),
           ],
 
@@ -203,7 +208,7 @@ class _DownloadPageState extends State<DownloadPage> {
             child: TextButton(
               onPressed: _loading ? null : _onDownload,
               style: TextButton.styleFrom(
-                backgroundColor: const Color(0xFFFF0000),
+                backgroundColor: AppColors.primary,
                 disabledBackgroundColor: const Color(0xFF3A1A1A),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -221,7 +226,7 @@ class _DownloadPageState extends State<DownloadPage> {
                   : const Text(
                       'Download',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: AppColors.lightBlue,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.3,
