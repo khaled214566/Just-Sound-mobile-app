@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:idgaf/core/configs/assets/app_vectors.dart';
 import 'package:idgaf/core/configs/theme/app_colors.dart';
+import 'package:idgaf/core/models/playlist_service.dart';
 import 'package:idgaf/core/models/search_delegate.dart';
 import 'package:idgaf/core/models/audio_player.dart';
 import 'package:idgaf/core/models/files_loader.dart';
@@ -47,6 +48,42 @@ class _SongsPageState extends State<SongsPage> {
 
   void _onAudioStateChanged() {
     if (mounted) setState(() {});
+  }
+
+  Future<void> _showAddToPlaylistSheet(
+    BuildContext context,
+    String songFilePath,
+  ) async {
+    final service = await PlaylistService.instance;
+    final playlists = service.playlistsNotifier.value;
+
+    if (playlists.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No playlists yet. Create one first.')),
+      );
+      return;
+    }
+
+    await showModalBottomSheet(
+      context: context,
+      builder: (ctx) => ListView.builder(
+        itemCount: playlists.length,
+        itemBuilder: (_, i) {
+          final playlist = playlists[i];
+          return ListTile(
+            leading: const Icon(Icons.playlist_play),
+            title: Text(playlist.name),
+            onTap: () async {
+              await service.addSongToPlaylist(playlist.id, songFilePath);
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Added to “${playlist.name}”')),
+              );
+            },
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _initialize() async {
@@ -149,7 +186,7 @@ class _SongsPageState extends State<SongsPage> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Just Sound'),
-          backgroundColor: AppColors.darkGrey,
+          backgroundColor: Colors.transparent,
           automaticallyImplyLeading: false,
         ),
         body: Center(child: Text(_debugMessage)),
@@ -216,6 +253,8 @@ class _SongsPageState extends State<SongsPage> {
                 child: ListTile(
                   contentPadding: const EdgeInsets.only(left: 10, right: 4),
                   onTap: () => _playSong(index),
+                  onLongPress: () =>
+                      _showAddToPlaylistSheet(context, song['filePath']),
                   shape: isSelected
                       ? ContinuousRectangleBorder(
                           borderRadius: BorderRadius.circular(20),

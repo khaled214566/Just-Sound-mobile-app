@@ -4,6 +4,7 @@ import 'package:idgaf/core/configs/assets/app_vectors.dart';
 import 'package:idgaf/core/models/audio_player.dart';
 import 'package:idgaf/core/models/miniPlayer.dart';
 import 'package:idgaf/presentation/pages/converter.dart';
+import 'package:idgaf/presentation/pages/playlists.dart';
 import 'package:idgaf/presentation/pages/songs_page.dart';
 import 'package:idgaf/presentation/pages/favorites.dart';
 
@@ -23,7 +24,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
   final List<Widget> _pages = [
     const SongsPage(),
     const FavoritesPage(),
-    const Center(child: Text('Playlists Page')),
+    const PlaylistsPage(),
     const DownloadPage(), // 👈 replaced placeholder
   ];
 

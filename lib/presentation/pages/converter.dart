@@ -155,7 +155,10 @@ class _DownloadPageState extends State<DownloadPage> {
           // URL field
           TextField(
             controller: _controller,
-            style: const TextStyle(color: AppColors.primary, fontSize: 14),
+            style: const TextStyle(
+              color: AppColors.lightBackground,
+              fontSize: 14,
+            ),
             cursorColor: AppColors.lightBlue,
             decoration: InputDecoration(
               hintText: 'Paste YouTube URL or video ID…',
