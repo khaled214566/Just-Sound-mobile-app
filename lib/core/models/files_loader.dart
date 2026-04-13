@@ -55,11 +55,7 @@ Future<Map<String, dynamic>> getSongMetadata(String filePath) async {
 class SongLoader {
   /// Directories scanned for local audio files.
   /// Must include [DownloadManager.saveDirectory] so downloaded tracks appear.
-  static const List<String> dirsToSearch = [
-    '/storage/emulated/0/Download',
-    // '/storage/emulated/0/Music',
-    // '/sdcard/Download',
-  ];
+  static const List<String> dirsToSearch = ['/storage/emulated/0/Download'];
 
   /// Audio extensions to include.
   static const List<String> _extensions = ['.mp3', '.m4a'];

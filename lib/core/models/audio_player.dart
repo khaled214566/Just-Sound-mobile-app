@@ -139,6 +139,15 @@ class AudioService {
     isPlaying.value = true;
   }
 
+  /// Returns the current playback position.
+  Future<Duration?> getPosition() async => _audioPlayer.position;
+
+  /// Returns the total duration of the current track.
+  Future<Duration?> getDuration() async => _audioPlayer.duration;
+
+  /// Seeks to the given [position] in the current track.
+  Future<void> seek(Duration position) async => _audioPlayer.seek(position);
+
   // Exposed for widgets that need low-level stream access (e.g. seek bar).
   AudioPlayer get player => _audioPlayer;
 
