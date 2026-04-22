@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
-enum SortOption { title, artist, date }
+enum SortOption { title, artist, album, date }
 
 enum SortBy { ascending, descending }
 
@@ -109,6 +109,7 @@ class _SortFilterBottomSheetState extends State<SortFilterBottomSheet> {
             options: const [
               _RadioOption(value: SortOption.title, label: 'Title'),
               _RadioOption(value: SortOption.artist, label: 'Artist'),
+              _RadioOption(value: SortOption.album, label: 'Album'),
               _RadioOption(value: SortOption.date, label: 'Date added'),
             ],
             groupValue: _sortBy,

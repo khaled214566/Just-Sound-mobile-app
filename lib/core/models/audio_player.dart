@@ -1,3 +1,4 @@
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
@@ -99,7 +100,20 @@ class AudioService {
     if (path == null) return;
 
     try {
-      await _audioPlayer.setFilePath(path);
+      await _audioPlayer.setAudioSource(
+        AudioSource.uri(
+          Uri.file(path),
+          tag: MediaItem(
+            id: path,
+            title: song['title'] ?? 'Unknown Title',
+            artist: song['artist'] ?? 'Unknown Artist',
+            album: song['album'] ?? 'Unknown Album',
+            duration: song['duration'] != null
+                ? Duration(milliseconds: song['duration'] as int)
+                : null,
+          ),
+        ),
+      );
       await _audioPlayer.play();
     } catch (e) {
       debugPrint("Error loading audio: $e");

@@ -82,6 +82,11 @@ class _FavoritesPageState extends State<FavoritesPage> {
               compare(a['artist'].toLowerCase(), b['artist'].toLowerCase()),
         );
         break;
+      case SortOption.album:
+        _cachedFavorites.sort(
+          (a, b) => compare(a['album'].toLowerCase(), b['album'].toLowerCase()),
+        );
+        break;
       case SortOption.date:
         _cachedFavorites.sort(
           (a, b) => compare(a['downloadDate'] as int, b['downloadDate'] as int),

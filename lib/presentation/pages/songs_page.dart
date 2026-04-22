@@ -130,6 +130,12 @@ class _SongsPageState extends State<SongsPage> {
                 compare(a['artist'].toLowerCase(), b['artist'].toLowerCase()),
           );
           break;
+        case SortOption.album:
+          _songs.sort(
+            (a, b) =>
+                compare(a['album'].toLowerCase(), b['album'].toLowerCase()),
+          );
+          break;
         case SortOption.date:
           _songs.sort(
             (a, b) => compare(
@@ -295,7 +301,7 @@ class _SongsPageState extends State<SongsPage> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
-                    song['artist'],
+                    "${song['artist']} • ${song['album']}",
                     style: TextStyle(
                       color: isSelected ? AppColors.lightBlue : null,
                     ),
