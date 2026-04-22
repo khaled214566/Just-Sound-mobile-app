@@ -40,6 +40,8 @@ dependencies:
   hydrated_bloc:
   path_provider: 
   just_audio: ^0.10.5
+  audio_service: ^0.18.12         
+  audio_session: ^0.1.18  
   permission_handler: ^12.0.1
   audio_metadata_reader: 
   sqflite: ^2.3.0
@@ -49,7 +51,7 @@ dependencies:
   hive_flutter: ^1.1.0
   audiotags: 
   http: ^1.2.0
-
+  just_audio_background: 
   hive_generator: ^2.0.1
   build_runner: ^2.4.9
 dev_dependencies:
