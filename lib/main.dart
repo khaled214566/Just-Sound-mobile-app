@@ -10,7 +10,6 @@ import 'package:idgaf/presentation/choose_mode/bloc/theme_cubit.dart';
 import 'package:idgaf/presentation/splash/pages/opening_page.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:just_audio_background/just_audio_background.dart';
 
 Future<void> main() async {
   await JustAudioBackground.init(
