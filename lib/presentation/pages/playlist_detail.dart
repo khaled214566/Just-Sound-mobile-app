@@ -1,3 +1,5 @@
+// ignore_for_file: unused_element
+
 import 'package:flutter/material.dart';
 import 'package:idgaf/core/configs/theme/app_colors.dart';
 import 'package:idgaf/core/models/audio_player.dart';
