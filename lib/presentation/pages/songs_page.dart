@@ -30,6 +30,10 @@ class _SongsPageState extends State<SongsPage> {
   SortOption _currentSort = SortOption.date;
   SortBy _currentOrder = SortBy.descending;
 
+  // Multi‑selection state
+  bool _isSelectionMode = false;
+  final Set<int> _selectedIndices = {};
+
   @override
   void initState() {
     super.initState();
@@ -52,7 +56,7 @@ class _SongsPageState extends State<SongsPage> {
 
   Future<void> _showAddToPlaylistSheet(
     BuildContext context,
-    String songFilePath,
+    List<String> songFilePaths,
   ) async {
     final service = await PlaylistService.instance;
     final playlists = service.playlistsNotifier.value;
@@ -74,10 +78,17 @@ class _SongsPageState extends State<SongsPage> {
             leading: const Icon(Icons.playlist_play),
             title: Text(playlist.name),
             onTap: () async {
-              await service.addSongToPlaylist(playlist.id, songFilePath);
+              // Add each selected song to the playlist
+              for (final path in songFilePaths) {
+                await service.addSongToPlaylist(playlist.id, path);
+              }
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Added to “${playlist.name}”')),
+                SnackBar(
+                  content: Text(
+                    'Added ${songFilePaths.length} song(s) to “${playlist.name}”',
+                  ),
+                ),
               );
             },
           );
@@ -107,7 +118,6 @@ class _SongsPageState extends State<SongsPage> {
           : 'Loaded ${songs.length} songs';
     });
 
-    // Update the audio service queue
     _audioService.setQueue(_songs);
     _sortSongs(_currentSort, _currentOrder);
   }
@@ -151,6 +161,7 @@ class _SongsPageState extends State<SongsPage> {
   }
 
   Future<void> _playSong(int index) async {
+    if (_isSelectionMode) return;
     await _audioService.playFromList(_songs, index);
   }
 
@@ -158,12 +169,46 @@ class _SongsPageState extends State<SongsPage> {
     String filePath,
     Map<String, dynamic> song,
   ) async {
+    if (_isSelectionMode) return; // Disable during selection
     if (_favoritesService.isFavorite(filePath)) {
       await _favoritesService.removeFavorite(filePath);
     } else {
       await _favoritesService.addFavorite(song);
     }
-    // No setState needed — the ValueListenableBuilder will handle it
+  }
+
+  void _enterSelectionMode(int startIndex) {
+    setState(() {
+      _isSelectionMode = true;
+      _selectedIndices.clear();
+      _selectedIndices.add(startIndex);
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _isSelectionMode = false;
+      _selectedIndices.clear();
+    });
+  }
+
+  void _toggleSelection(int index) {
+    setState(() {
+      if (_selectedIndices.contains(index)) {
+        _selectedIndices.remove(index);
+      } else {
+        _selectedIndices.add(index);
+      }
+    });
+  }
+
+  Future<void> _addSelectedToPlaylist() async {
+    if (_selectedIndices.isEmpty) return;
+    final selectedPaths = _selectedIndices
+        .map((idx) => _songs[idx]['filePath'] as String)
+        .toList();
+    await _showAddToPlaylistSheet(context, selectedPaths);
+    _exitSelectionMode();
   }
 
   @override
@@ -204,43 +249,7 @@ class _SongsPageState extends State<SongsPage> {
         title: const Text('Just Sound'),
         backgroundColor: AppColors.darkGrey,
         automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading
-                ? null
-                : () async {
-                    setState(() {
-                      _isLoading = true;
-                      _debugMessage = 'Scanning...';
-                    });
-                    await _initialize();
-                  },
-          ),
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              showSearch(context: context, delegate: MySearchDelegate());
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.sort),
-            onPressed: () async {
-              final result = await showSortFilterSheet(
-                context,
-                initialSort: _currentSort,
-                initialWay: _currentOrder,
-              );
-              if (result != null) {
-                setState(() {
-                  _currentSort = result.sortBy;
-                  _currentOrder = result.genre;
-                });
-                _sortSongs(_currentSort, _currentOrder);
-              }
-            },
-          ),
-        ],
+        actions: _buildAppBarActions(),
       ),
       body: ValueListenableBuilder<Set<String>>(
         valueListenable: _favoritesService.favoriteFilePathsNotifier,
@@ -250,18 +259,28 @@ class _SongsPageState extends State<SongsPage> {
             itemBuilder: (context, index) {
               final song = _songs[index];
               final String? playingPath = _audioService.currentFilePath.value;
-              final bool isSelected =
+              final bool isPlaying =
                   playingPath != null && playingPath == song['filePath'];
               final bool isFavorite = favoritePaths.contains(song['filePath']);
+              final bool isSelected = _selectedIndices.contains(index);
 
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: ListTile(
                   contentPadding: const EdgeInsets.only(left: 10, right: 4),
-                  onTap: () => _playSong(index),
-                  onLongPress: () =>
-                      _showAddToPlaylistSheet(context, song['filePath']),
-                  shape: isSelected
+                  onTap: () {
+                    if (_isSelectionMode) {
+                      _toggleSelection(index);
+                    } else {
+                      _playSong(index);
+                    }
+                  },
+                  onLongPress: () {
+                    if (!_isSelectionMode) {
+                      _enterSelectionMode(index);
+                    }
+                  },
+                  shape: isPlaying && !_isSelectionMode
                       ? ContinuousRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
                           side: BorderSide(
@@ -295,7 +314,9 @@ class _SongsPageState extends State<SongsPage> {
                     song['title'],
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      color: isSelected ? AppColors.lightBlue : null,
+                      color: isPlaying && !_isSelectionMode
+                          ? AppColors.lightBlue
+                          : null,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -303,19 +324,28 @@ class _SongsPageState extends State<SongsPage> {
                   subtitle: Text(
                     "${song['artist']} • ${song['album']}",
                     style: TextStyle(
-                      color: isSelected ? AppColors.lightBlue : null,
+                      color: isPlaying && !_isSelectionMode
+                          ? AppColors.lightBlue
+                          : null,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  trailing: IconButton(
-                    icon: Icon(
-                      isFavorite ? Icons.favorite : Icons.favorite_border,
-                      color: isFavorite ? Colors.red : null,
-                    ),
-                    onPressed: () => _toggleFavorite(song['filePath'], song),
-                  ),
-                  selected: isSelected,
+                  trailing: _isSelectionMode
+                      ? Checkbox(
+                          value: isSelected,
+                          onChanged: null, // toggled by tile tap
+                          activeColor: AppColors.lightBlue,
+                        )
+                      : IconButton(
+                          icon: Icon(
+                            isFavorite ? Icons.favorite : Icons.favorite_border,
+                            color: isFavorite ? Colors.red : null,
+                          ),
+                          onPressed: () =>
+                              _toggleFavorite(song['filePath'], song),
+                        ),
+                  selected: isPlaying && !_isSelectionMode,
                   selectedTileColor: AppColors.primary,
                 ),
               );
@@ -324,5 +354,69 @@ class _SongsPageState extends State<SongsPage> {
         },
       ),
     );
+  }
+
+  List<Widget> _buildAppBarActions() {
+    if (_isSelectionMode) {
+      return [
+        if (_selectedIndices.isNotEmpty)
+          IconButton(
+            icon: const Icon(Icons.playlist_add),
+            onPressed: _addSelectedToPlaylist,
+            tooltip: 'Add to playlist',
+          ),
+        IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: _exitSelectionMode,
+          tooltip: 'Cancel',
+        ),
+      ];
+    } else {
+      return [
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          onPressed: _isLoading
+              ? null
+              : () async {
+                  setState(() {
+                    _isLoading = true;
+                    _debugMessage = 'Scanning...';
+                  });
+                  await _initialize();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Scanned ${_songs.length} songs'),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
+        ),
+        IconButton(
+          icon: const Icon(Icons.search),
+          onPressed: () {
+            showSearch(context: context, delegate: MySearchDelegate());
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.sort),
+          onPressed: () async {
+            final result = await showSortFilterSheet(
+              context,
+              initialSort: _currentSort,
+              initialWay: _currentOrder,
+            );
+            if (result != null) {
+              setState(() {
+                _currentSort = result.sortBy;
+                _currentOrder = result.genre;
+              });
+              _sortSongs(_currentSort, _currentOrder);
+            }
+          },
+        ),
+      ];
+    }
   }
 }

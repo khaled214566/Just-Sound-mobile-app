@@ -1,37 +1,46 @@
 import 'package:flutter/material.dart';
-import 'package:idgaf/core/configs/assets/app_vectors.dart';
 import 'package:idgaf/presentation/intro/pages/get_started.dart';
+import 'package:idgaf/presentation/home/home.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+// your main app page
 
-class SplashPage extends StatefulWidget {
-  const SplashPage({super.key});
+class OpeningPage extends StatefulWidget {
+  const OpeningPage({super.key});
 
   @override
-  State<SplashPage> createState() => _SplashPageState();
+  State<OpeningPage> createState() => _OpeningPageState();
 }
 
-class _SplashPageState extends State<SplashPage> {
+class _OpeningPageState extends State<OpeningPage> {
   @override
   void initState() {
     super.initState();
-    redirect();
+    checkFirstLaunch();
+  }
+
+  Future<void> checkFirstLaunch() async {
+    final prefs = await SharedPreferences.getInstance();
+    bool isFirstLaunch = prefs.getBool('first_launch') ?? true;
+
+    if (isFirstLaunch) {
+      await prefs.setBool('first_launch', false);
+
+      // First time → show onboarding
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const GetStartedPage()),
+      );
+    } else {
+      // Not first time → skip
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const Home()),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Image.asset(AppVectors.logo, width: 150, height: 150),
-      ),
-    );
-  }
-
-  Future<void> redirect() async {
-    await Future.delayed(const Duration(seconds: 2));
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (BuildContext context) => const GetStartedPage(),
-      ),
-    );
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }

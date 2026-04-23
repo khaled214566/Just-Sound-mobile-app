@@ -25,6 +25,10 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
   List<Map<String, dynamic>> _songs = [];
   bool _isLoading = true;
 
+  // Multi‑selection state
+  bool _isSelectionMode = false;
+  final Set<int> _selectedIndices = {};
+
   @override
   void initState() {
     super.initState();
@@ -50,6 +54,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
   }
 
   Future<void> _playSong(int index) async {
+    if (_isSelectionMode) return; // never play when selecting
     await _audioService.playFromList(_songs, index);
   }
 
@@ -63,6 +68,55 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
     });
   }
 
+  /// Remove all selected songs from the playlist (not from device).
+  Future<void> _deleteSelected() async {
+    final filePathsToRemove = _selectedIndices
+        .map((idx) => _songs[idx]['filePath'] as String)
+        .toList();
+
+    // Batch remove from playlist service
+    for (final path in filePathsToRemove) {
+      await widget.playlistService.removeSongFromPlaylist(
+        widget.playlist.id,
+        path,
+      );
+    }
+
+    // Update local list
+    setState(() {
+      _songs.removeWhere(
+        (song) => filePathsToRemove.contains(song['filePath'] as String),
+      );
+      _isSelectionMode = false;
+      _selectedIndices.clear();
+    });
+  }
+
+  void _enterSelectionMode(int startIndex) {
+    setState(() {
+      _isSelectionMode = true;
+      _selectedIndices.clear();
+      _selectedIndices.add(startIndex);
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _isSelectionMode = false;
+      _selectedIndices.clear();
+    });
+  }
+
+  void _toggleSelection(int index) {
+    setState(() {
+      if (_selectedIndices.contains(index)) {
+        _selectedIndices.remove(index);
+      } else {
+        _selectedIndices.add(index);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -70,42 +124,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
       appBar: AppBar(
         backgroundColor: AppColors.darkGrey,
         title: Text(widget.playlist.name),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () async {
-              final controller = TextEditingController(
-                text: widget.playlist.name,
-              );
-              final newName = await showDialog<String>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Rename Playlist'),
-                  content: TextField(controller: controller, autofocus: true),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Cancel'),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        final name = controller.text.trim();
-                        if (name.isNotEmpty) Navigator.pop(ctx, name);
-                      },
-                      child: const Text('Save'),
-                    ),
-                  ],
-                ),
-              );
-              if (newName != null) {
-                await widget.playlistService.renamePlaylist(
-                  widget.playlist.id,
-                  newName,
-                );
-              }
-            },
-          ),
-        ],
+        actions: _buildAppBarActions(),
       ),
       body: Column(
         children: [
@@ -138,90 +157,82 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
                         itemCount: _songs.length,
                         itemBuilder: (context, index) {
                           final song = _songs[index];
-                          final bool isSelected =
+                          final bool isSelected = _selectedIndices.contains(
+                            index,
+                          );
+                          final bool isPlaying =
                               playingPath == song['filePath'];
 
-                          return Dismissible(
-                            key: Key(song['filePath']),
-                            direction: DismissDirection.endToStart,
-                            background: Container(
-                              color: Colors.red,
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.only(right: 20),
-                              child: const Icon(
-                                Icons.delete,
-                                color: Colors.white,
-                              ),
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
                             ),
-                            onDismissed: (_) => _removeSong(song['filePath']),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.only(
-                                  left: 10,
-                                  right: 4,
-                                ),
-                                onTap: () => _playSong(index),
-                                shape: isSelected
-                                    ? ContinuousRectangleBorder(
-                                        borderRadius: BorderRadius.circular(20),
-                                        side: BorderSide(
-                                          color: AppColors.lightBlue,
-                                          width: 2,
-                                        ),
-                                      )
+                            onTap: () {
+                              if (_isSelectionMode) {
+                                _toggleSelection(index);
+                              } else {
+                                _playSong(index);
+                              }
+                            },
+                            onLongPress: () {
+                              if (!_isSelectionMode) {
+                                _enterSelectionMode(index);
+                              }
+                            },
+                            leading: song['artwork'] != null
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.memory(
+                                      song['artwork'],
+                                      width: 50,
+                                      height: 50,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  )
+                                : Container(
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[800],
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(
+                                      Icons.music_note,
+                                      color: Colors.white54,
+                                    ),
+                                  ),
+                            title: Text(
+                              song['title'],
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: isPlaying && !_isSelectionMode
+                                    ? AppColors.lightBlue
                                     : null,
-                                leading: song['artwork'] != null
-                                    ? ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Image.memory(
-                                          song['artwork'],
-                                          width: 50,
-                                          height: 50,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      )
-                                    : Container(
-                                        width: 50,
-                                        height: 50,
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey[800],
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.music_note,
-                                          color: Colors.white54,
-                                        ),
-                                      ),
-                                title: Text(
-                                  song['title'],
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: isSelected
-                                        ? AppColors.lightBlue
-                                        : null,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                subtitle: Text(
-                                  song['artist'],
-                                  style: TextStyle(
-                                    color: isSelected
-                                        ? AppColors.lightBlue
-                                        : null,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                selected: isSelected,
-                                selectedTileColor: AppColors.primary,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
+                            subtitle: Text(
+                              song['artist'],
+                              style: TextStyle(
+                                color: isPlaying && !_isSelectionMode
+                                    ? AppColors.lightBlue
+                                    : null,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: _isSelectionMode
+                                ? Checkbox(
+                                    value: isSelected,
+                                    onChanged:
+                                        null, // visual only – toggled by tile tap
+                                    activeColor: AppColors.lightBlue,
+                                  )
+                                : null,
+                            selected: isPlaying && !_isSelectionMode,
+                            selectedTileColor: AppColors.primary,
                           );
                         },
                       );
@@ -238,5 +249,61 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
         ],
       ),
     );
+  }
+
+  List<Widget> _buildAppBarActions() {
+    if (_isSelectionMode) {
+      return [
+        if (_selectedIndices.isNotEmpty)
+          IconButton(
+            icon: const Icon(Icons.delete),
+            onPressed: _deleteSelected,
+            tooltip: 'Remove selected',
+          ),
+        IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: _exitSelectionMode,
+          tooltip: 'Cancel',
+        ),
+      ];
+    } else {
+      return [
+        IconButton(
+          icon: const Icon(Icons.edit),
+          onPressed: () async {
+            final controller = TextEditingController(
+              text: widget.playlist.name,
+            );
+            final newName = await showDialog<String>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Rename Playlist'),
+                content: TextField(controller: controller, autofocus: true),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      final name = controller.text.trim();
+                      if (name.isNotEmpty) Navigator.pop(ctx, name);
+                    },
+                    child: const Text('Save'),
+                  ),
+                ],
+              ),
+            );
+            if (newName != null) {
+              await widget.playlistService.renamePlaylist(
+                widget.playlist.id,
+                newName,
+              );
+              setState(() {}); // refresh title
+            }
+          },
+        ),
+      ];
+    }
   }
 }
