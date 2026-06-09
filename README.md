@@ -16,6 +16,11 @@ The app includes:
 - Light/Dark mode selection and theme persistence
 - First-launch onboarding flow
 
+
+<div align="center">
+  <img src="assets/images/songs_page.jpg" alt="Screenshot" width="360" height="756" style="display:inline-block; margin:0 8px;" />
+  <img src="assets/images/sort.jpg" alt="Screenshot" width="360" height="756" style="display:inline-block; margin:0 8px;" />
+</div>
 ## Key Features
 
 ### Audio Playback
@@ -26,12 +31,23 @@ The app includes:
 - Uses `just_audio` and `just_audio_background` for smooth playback
 - Handles next-track autoplay and playback state changes
 
+
+<div align="center">
+  <img src="assets/images/song_playing.jpg" alt="Screenshot" width="360" height="756" />
+</div>
+
+
 ### Favorites
 
 - Mark songs as favorites from the main track list
 - Favorites persist in a local SQLite database
 - View and play favorites in a dedicated tab
 - Remove favorites directly from the favorites screen
+
+<div align="center">
+  <img src="assets/images/favorites.jpg" alt="Screenshot" width="360" height="756" />
+</div>
+
 
 ### Playlists
 
@@ -40,6 +56,10 @@ The app includes:
 - View playlist contents and play songs from a playlist
 - Remove songs from a playlist without deleting the file
 
+<div align="center">
+  <img src="assets/images/playlists.jpg" alt="Screenshot" width="360" height="756" />
+</div>
+
 ### Download / Converter
 
 - Paste a YouTube URL or video ID to download audio
@@ -47,6 +67,10 @@ The app includes:
 - Writes downloaded files to device storage
 - Embeds track metadata and artwork using `audiotags`
 - Shows download status, progress, and controls
+
+<div align="center">
+  <img src="assets/images/downloader_page.jpg" alt="Screenshot" width="360" height="756" />
+</div>
 
 ### Theme & Onboarding
 
